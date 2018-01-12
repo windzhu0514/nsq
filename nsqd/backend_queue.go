@@ -1,5 +1,6 @@
 package nsqd
 
+// BackendQueue代表了辅助消息存储系统的行为
 // BackendQueue represents the behavior for the secondary message
 // storage system
 type BackendQueue interface {

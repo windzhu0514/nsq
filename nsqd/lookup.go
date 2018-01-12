@@ -50,10 +50,10 @@ func connectCallback(n *NSQD, hostname string, syncTopicChan chan *lookupPeer) f
 }
 
 func (n *NSQD) lookupLoop() {
-	var lookupPeers []*lookupPeer
-	var lookupAddrs []string
+	var lookupPeers []*lookupPeer  // nsqlookupd 连接器
+	var lookupAddrs []string // nsqlookupd 地址
 	syncTopicChan := make(chan *lookupPeer)
-	connect := true
+	connect := true // 第一次先进行连接
 
 	hostname, err := os.Hostname()
 	if err != nil {
@@ -61,6 +61,7 @@ func (n *NSQD) lookupLoop() {
 		os.Exit(1)
 	}
 
+	// 因为公告，lookupd自动决定host
 	// for announcements, lookupd determines the host automatically
 	ticker := time.Tick(15 * time.Second)
 	for {
@@ -72,6 +73,7 @@ func (n *NSQD) lookupLoop() {
 				n.logf(LOG_INFO, "LOOKUP(%s): adding peer", host)
 				lookupPeer := newLookupPeer(host, n.getOpts().MaxBodySize, n.logf,
 					connectCallback(n, hostname, syncTopicChan))
+				// 触发连接
 				lookupPeer.Command(nil) // start the connection
 				lookupPeers = append(lookupPeers, lookupPeer)
 				lookupAddrs = append(lookupAddrs, host)
@@ -82,6 +84,7 @@ func (n *NSQD) lookupLoop() {
 
 		select {
 		case <-ticker:
+			// 发送心跳并读取响应（读取会检测关闭的连接）
 			// send a heartbeat and read a response (read detects closed conns)
 			for _, lookupPeer := range lookupPeers {
 				n.logf(LOG_DEBUG, "LOOKUPD(%s): sending heartbeat", lookupPeer)
@@ -97,6 +100,7 @@ func (n *NSQD) lookupLoop() {
 
 			switch val.(type) {
 			case *Channel:
+				// 通知所有的 nsqlookupds 添加了一个channel或者删除了一个channel
 				// notify all nsqlookupds that a new channel exists, or that it's removed
 				branch = "channel"
 				channel := val.(*Channel)
@@ -106,6 +110,7 @@ func (n *NSQD) lookupLoop() {
 					cmd = nsq.Register(channel.topicName, channel.name)
 				}
 			case *Topic:
+				// 通知所有的 nsqlookupds 添加了一个topic或者删除了一个topic
 				// notify all nsqlookupds that a new topic exists, or that it's removed
 				branch = "topic"
 				topic := val.(*Topic)

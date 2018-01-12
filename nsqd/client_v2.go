@@ -49,8 +49,8 @@ type identifyEvent struct {
 
 type clientV2 struct {
 	// 64bit atomic vars need to be first for proper alignment on 32bit platforms
-	ReadyCount    int64
-	InFlightCount int64
+	ReadyCount    int64 // 就绪客户端数量
+	InFlightCount int64 // 正在发送的消息数量
 	MessageCount  uint64
 	FinishCount   uint64
 	RequeueCount  uint64

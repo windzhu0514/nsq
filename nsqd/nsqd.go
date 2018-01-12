@@ -35,6 +35,8 @@ const (
 	TLSRequired
 )
 
+// 此处为什么要用结构体包一层
+// 因为error是一个接口？ 不能用于atomic操作？
 type errStore struct {
 	err error
 }
@@ -63,7 +65,7 @@ type NSQD struct {
 
 	poolSize int
 
-	notifyChan           chan interface{}
+	notifyChan           chan interface{} // 通知topic、channel添加和删除
 	optsNotificationChan chan struct{}
 	exitChan             chan int
 	waitGroup            util.WaitGroupWrapper
@@ -218,6 +220,7 @@ func (n *NSQD) Main() {
 
 	ctx := &context{n}
 
+	// 该监听用于客户端消
 	tcpListener, err := net.Listen("tcp", n.getOpts().TCPAddress)
 	if err != nil {
 		n.logf(LOG_FATAL, "listen (%s) failed - %s", n.getOpts().TCPAddress, err)
@@ -231,6 +234,8 @@ func (n *NSQD) Main() {
 		protocol.TCPServer(n.tcpListener, tcpServer, n.logf)
 	})
 
+	// 对外api 用于后台操作和消息的发布
+	// https
 	if n.tlsConfig != nil && n.getOpts().HTTPSAddress != "" {
 		httpsListener, err = tls.Listen("tcp", n.getOpts().HTTPSAddress, n.tlsConfig)
 		if err != nil {
@@ -245,6 +250,8 @@ func (n *NSQD) Main() {
 			http_api.Serve(n.httpsListener, httpsServer, "HTTPS", n.logf)
 		})
 	}
+
+
 	httpListener, err = net.Listen("tcp", n.getOpts().HTTPAddress)
 	if err != nil {
 		n.logf(LOG_FATAL, "listen (%s) failed - %s", n.getOpts().HTTPAddress, err)

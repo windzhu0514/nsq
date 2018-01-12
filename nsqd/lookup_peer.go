@@ -11,6 +11,7 @@ import (
 	"github.com/nsqio/nsq/internal/lg"
 )
 
+// 一个lookupPeer实例用来懒惰连接nsqlookupd和优雅的重连
 // lookupPeer is a low-level type for connecting/reading/writing to nsqlookupd
 //
 // A lookupPeer instance is designed to connect lazily to nsqlookupd and reconnect
@@ -34,6 +35,7 @@ type peerInfo struct {
 	BroadcastAddress string `json:"broadcast_address"`
 }
 
+// 实例每次连接时都会调用提供的connectCallback函数
 // newLookupPeer creates a new lookupPeer instance connecting to the supplied address.
 //
 // The supplied connectCallback will be called *every* time the instance connects.

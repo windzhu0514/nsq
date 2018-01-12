@@ -76,6 +76,7 @@ func (a *State) IsExpired() bool {
 	return false
 }
 
+// 查询其他nsqd认证状态
 func QueryAnyAuthd(authd []string, remoteIP, tlsEnabled, authSecret string,
 	connectTimeout time.Duration, requestTimeout time.Duration) (*State, error) {
 	for _, a := range authd {
