@@ -35,8 +35,6 @@ const (
 	TLSRequired
 )
 
-// 此处为什么要用结构体包一层
-// 因为error是一个接口？ 不能用于atomic操作？
 type errStore struct {
 	err error
 }
@@ -65,7 +63,7 @@ type NSQD struct {
 
 	poolSize int
 
-	notifyChan           chan interface{} // 通知topic、channel添加和删除
+	notifyChan           chan interface{}
 	optsNotificationChan chan struct{}
 	exitChan             chan int
 	waitGroup            util.WaitGroupWrapper
@@ -93,6 +91,8 @@ func New(opts *Options) *NSQD {
 	}
 	httpcli := http_api.NewClient(nil, opts.HTTPClientConnectTimeout, opts.HTTPClientRequestTimeout)
 	n.ci = clusterinfo.New(n.logf, httpcli)
+
+	n.lookupPeers.Store([]*lookupPeer{})
 
 	n.swapOpts(opts)
 	n.errValue.Store(errStore{})
@@ -150,6 +150,13 @@ func New(opts *Options) *NSQD {
 	}
 	n.tlsConfig = tlsConfig
 
+	for _, v := range opts.E2EProcessingLatencyPercentiles {
+		if v <= 0 || v > 1 {
+			n.logf(LOG_FATAL, "Invalid percentile: %v", v)
+			os.Exit(1)
+		}
+	}
+
 	n.logf(LOG_INFO, version.String("nsqd"))
 	n.logf(LOG_INFO, "ID: %d", opts.ID)
 
@@ -172,20 +179,14 @@ func (n *NSQD) triggerOptsNotification() {
 }
 
 func (n *NSQD) RealTCPAddr() *net.TCPAddr {
-	n.RLock()
-	defer n.RUnlock()
 	return n.tcpListener.Addr().(*net.TCPAddr)
 }
 
 func (n *NSQD) RealHTTPAddr() *net.TCPAddr {
-	n.RLock()
-	defer n.RUnlock()
 	return n.httpListener.Addr().(*net.TCPAddr)
 }
 
 func (n *NSQD) RealHTTPSAddr() *net.TCPAddr {
-	n.RLock()
-	defer n.RUnlock()
 	return n.httpsListener.Addr().(*net.TCPAddr)
 }
 
@@ -215,60 +216,46 @@ func (n *NSQD) GetStartTime() time.Time {
 }
 
 func (n *NSQD) Main() {
-	var httpListener net.Listener
-	var httpsListener net.Listener
-
+	var err error
 	ctx := &context{n}
 
-	// 该监听用于客户端消
-	tcpListener, err := net.Listen("tcp", n.getOpts().TCPAddress)
+	n.tcpListener, err = net.Listen("tcp", n.getOpts().TCPAddress)
 	if err != nil {
 		n.logf(LOG_FATAL, "listen (%s) failed - %s", n.getOpts().TCPAddress, err)
 		os.Exit(1)
 	}
-	n.Lock()
-	n.tcpListener = tcpListener
-	n.Unlock()
-	tcpServer := &tcpServer{ctx: ctx}
-	n.waitGroup.Wrap(func() {
-		protocol.TCPServer(n.tcpListener, tcpServer, n.logf)
-	})
-
-	// 对外api 用于后台操作和消息的发布
-	// https
+	n.httpListener, err = net.Listen("tcp", n.getOpts().HTTPAddress)
+	if err != nil {
+		n.logf(LOG_FATAL, "listen (%s) failed - %s", n.getOpts().HTTPAddress, err)
+		os.Exit(1)
+	}
 	if n.tlsConfig != nil && n.getOpts().HTTPSAddress != "" {
-		httpsListener, err = tls.Listen("tcp", n.getOpts().HTTPSAddress, n.tlsConfig)
+		n.httpsListener, err = tls.Listen("tcp", n.getOpts().HTTPSAddress, n.tlsConfig)
 		if err != nil {
 			n.logf(LOG_FATAL, "listen (%s) failed - %s", n.getOpts().HTTPSAddress, err)
 			os.Exit(1)
 		}
-		n.Lock()
-		n.httpsListener = httpsListener
-		n.Unlock()
+	}
+
+	tcpServer := &tcpServer{ctx: ctx}
+	n.waitGroup.Wrap(func() {
+		protocol.TCPServer(n.tcpListener, tcpServer, n.logf)
+	})
+	httpServer := newHTTPServer(ctx, false, n.getOpts().TLSRequired == TLSRequired)
+	n.waitGroup.Wrap(func() {
+		http_api.Serve(n.httpListener, httpServer, "HTTP", n.logf)
+	})
+	if n.tlsConfig != nil && n.getOpts().HTTPSAddress != "" {
 		httpsServer := newHTTPServer(ctx, true, true)
 		n.waitGroup.Wrap(func() {
 			http_api.Serve(n.httpsListener, httpsServer, "HTTPS", n.logf)
 		})
 	}
 
-
-	httpListener, err = net.Listen("tcp", n.getOpts().HTTPAddress)
-	if err != nil {
-		n.logf(LOG_FATAL, "listen (%s) failed - %s", n.getOpts().HTTPAddress, err)
-		os.Exit(1)
-	}
-	n.Lock()
-	n.httpListener = httpListener
-	n.Unlock()
-	httpServer := newHTTPServer(ctx, false, n.getOpts().TLSRequired == TLSRequired)
-	n.waitGroup.Wrap(func() {
-		http_api.Serve(n.httpListener, httpServer, "HTTP", n.logf)
-	})
-
-	n.waitGroup.Wrap(func() { n.queueScanLoop() })
-	n.waitGroup.Wrap(func() { n.lookupLoop() })
+	n.waitGroup.Wrap(n.queueScanLoop)
+	n.waitGroup.Wrap(n.lookupLoop)
 	if n.getOpts().StatsdAddress != "" {
-		n.waitGroup.Wrap(func() { n.statsdLoop() })
+		n.waitGroup.Wrap(n.statsdLoop)
 	}
 }
 
@@ -361,7 +348,6 @@ func (n *NSQD) LoadMetadata() error {
 		if t.Paused {
 			topic.Pause()
 		}
-
 		for _, c := range t.Channels {
 			if !protocol.IsValidChannelName(c.Name) {
 				n.logf(LOG_WARN, "skipping creation of invalid channel %s", c.Name)
@@ -372,6 +358,7 @@ func (n *NSQD) LoadMetadata() error {
 				channel.Pause()
 			}
 		}
+		topic.Start()
 	}
 	return nil
 }
@@ -485,10 +472,11 @@ func (n *NSQD) Exit() {
 	}
 	n.Unlock()
 
+	n.logf(LOG_INFO, "NSQ: stopping subsystems")
 	close(n.exitChan)
 	n.waitGroup.Wait()
-
 	n.dl.Unlock()
+	n.logf(LOG_INFO, "NSQ: bye")
 }
 
 // GetTopic performs a thread safe operation
@@ -515,12 +503,15 @@ func (n *NSQD) GetTopic(topicName string) *Topic {
 	t = NewTopic(topicName, &context{n}, deleteCallback)
 	n.topicMap[topicName] = t
 
-	n.logf(LOG_INFO, "TOPIC(%s): created", t.name)
-
-	// release our global nsqd lock, and switch to a more granular topic lock while we init our
-	// channels from lookupd. This blocks concurrent PutMessages to this topic.
-	t.Lock()
 	n.Unlock()
+
+	n.logf(LOG_INFO, "TOPIC(%s): created", t.name)
+	// topic is created but messagePump not yet started
+
+	// if loading metadata at startup, no lookupd connections yet, topic started after load
+	if atomic.LoadInt32(&n.isLoading) == 1 {
+		return t
+	}
 
 	// if using lookupd, make a blocking call to get the topics, and immediately create them.
 	// this makes sure that any message received is buffered to the right channels
@@ -532,28 +523,16 @@ func (n *NSQD) GetTopic(topicName string) *Topic {
 		}
 		for _, channelName := range channelNames {
 			if strings.HasSuffix(channelName, "#ephemeral") {
-				// we don't want to pre-create ephemeral channels
-				// because there isn't a client connected
-				continue
+				continue // do not create ephemeral channel with no consumer client
 			}
-			t.getOrCreateChannel(channelName)
+			t.GetChannel(channelName)
 		}
 	} else if len(n.getOpts().NSQLookupdTCPAddresses) > 0 {
 		n.logf(LOG_ERROR, "no available nsqlookupd to query for channels to pre-create for topic %s", t.name)
 	}
 
-	t.Unlock()
-
-	// NOTE: I would prefer for this to only happen in topic.GetChannel() but we're special
-	// casing the code above so that we can control the locks such that it is impossible
-	// for a message to be written to a (new) topic while we're looking up channels
-	// from lookupd...
-	//
-	// update messagePump state
-	select {
-	case t.channelUpdateChan <- 1:
-	case <-t.exitChan:
-	}
+	// now that all channels are added, start topic messagePump
+	t.Start()
 	return t
 }
 

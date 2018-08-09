@@ -12,7 +12,7 @@ import (
 	"github.com/nsqio/nsq/internal/version"
 )
 
-func connectCallback(n *NSQD, hostname string, syncTopicChan chan *lookupPeer) func(*lookupPeer) {
+func connectCallback(n *NSQD, hostname string) func(*lookupPeer) {
 	return func(lp *lookupPeer) {
 		ci := make(map[string]interface{})
 		ci["version"] = version.Binary
@@ -29,12 +29,17 @@ func connectCallback(n *NSQD, hostname string, syncTopicChan chan *lookupPeer) f
 		resp, err := lp.Command(cmd)
 		if err != nil {
 			n.logf(LOG_ERROR, "LOOKUPD(%s): %s - %s", lp, cmd, err)
+			return
 		} else if bytes.Equal(resp, []byte("E_INVALID")) {
 			n.logf(LOG_INFO, "LOOKUPD(%s): lookupd returned %s", lp, resp)
+			lp.Close()
+			return
 		} else {
 			err = json.Unmarshal(resp, &lp.Info)
 			if err != nil {
 				n.logf(LOG_ERROR, "LOOKUPD(%s): parsing response - %s", lp, resp)
+				lp.Close()
+				return
 			} else {
 				n.logf(LOG_INFO, "LOOKUPD(%s): peer info %+v", lp, lp.Info)
 				if lp.Info.BroadcastAddress == "" {
@@ -43,17 +48,37 @@ func connectCallback(n *NSQD, hostname string, syncTopicChan chan *lookupPeer) f
 			}
 		}
 
-		go func() {
-			syncTopicChan <- lp
-		}()
+		// build all the commands first so we exit the lock(s) as fast as possible
+		var commands []*nsq.Command
+		n.RLock()
+		for _, topic := range n.topicMap {
+			topic.RLock()
+			if len(topic.channelMap) == 0 {
+				commands = append(commands, nsq.Register(topic.name, ""))
+			} else {
+				for _, channel := range topic.channelMap {
+					commands = append(commands, nsq.Register(channel.topicName, channel.name))
+				}
+			}
+			topic.RUnlock()
+		}
+		n.RUnlock()
+
+		for _, cmd := range commands {
+			n.logf(LOG_INFO, "LOOKUPD(%s): %s", lp, cmd)
+			_, err := lp.Command(cmd)
+			if err != nil {
+				n.logf(LOG_ERROR, "LOOKUPD(%s): %s - %s", lp, cmd, err)
+				return
+			}
+		}
 	}
 }
 
 func (n *NSQD) lookupLoop() {
-	var lookupPeers []*lookupPeer  // nsqlookupd 连接器
-	var lookupAddrs []string // nsqlookupd 地址
-	syncTopicChan := make(chan *lookupPeer)
-	connect := true // 第一次先进行连接
+	var lookupPeers []*lookupPeer
+	var lookupAddrs []string
+	connect := true
 
 	hostname, err := os.Hostname()
 	if err != nil {
@@ -61,7 +86,6 @@ func (n *NSQD) lookupLoop() {
 		os.Exit(1)
 	}
 
-	// 因为公告，lookupd自动决定host
 	// for announcements, lookupd determines the host automatically
 	ticker := time.Tick(15 * time.Second)
 	for {
@@ -72,8 +96,7 @@ func (n *NSQD) lookupLoop() {
 				}
 				n.logf(LOG_INFO, "LOOKUP(%s): adding peer", host)
 				lookupPeer := newLookupPeer(host, n.getOpts().MaxBodySize, n.logf,
-					connectCallback(n, hostname, syncTopicChan))
-				// 触发连接
+					connectCallback(n, hostname))
 				lookupPeer.Command(nil) // start the connection
 				lookupPeers = append(lookupPeers, lookupPeer)
 				lookupAddrs = append(lookupAddrs, host)
@@ -84,7 +107,6 @@ func (n *NSQD) lookupLoop() {
 
 		select {
 		case <-ticker:
-			// 发送心跳并读取响应（读取会检测关闭的连接）
 			// send a heartbeat and read a response (read detects closed conns)
 			for _, lookupPeer := range lookupPeers {
 				n.logf(LOG_DEBUG, "LOOKUPD(%s): sending heartbeat", lookupPeer)
@@ -100,7 +122,6 @@ func (n *NSQD) lookupLoop() {
 
 			switch val.(type) {
 			case *Channel:
-				// 通知所有的 nsqlookupds 添加了一个channel或者删除了一个channel
 				// notify all nsqlookupds that a new channel exists, or that it's removed
 				branch = "channel"
 				channel := val.(*Channel)
@@ -110,7 +131,6 @@ func (n *NSQD) lookupLoop() {
 					cmd = nsq.Register(channel.topicName, channel.name)
 				}
 			case *Topic:
-				// 通知所有的 nsqlookupds 添加了一个topic或者删除了一个topic
 				// notify all nsqlookupds that a new topic exists, or that it's removed
 				branch = "topic"
 				topic := val.(*Topic)
@@ -126,31 +146,6 @@ func (n *NSQD) lookupLoop() {
 				_, err := lookupPeer.Command(cmd)
 				if err != nil {
 					n.logf(LOG_ERROR, "LOOKUPD(%s): %s - %s", lookupPeer, cmd, err)
-				}
-			}
-		case lookupPeer := <-syncTopicChan:
-			var commands []*nsq.Command
-			// build all the commands first so we exit the lock(s) as fast as possible
-			n.RLock()
-			for _, topic := range n.topicMap {
-				topic.RLock()
-				if len(topic.channelMap) == 0 {
-					commands = append(commands, nsq.Register(topic.name, ""))
-				} else {
-					for _, channel := range topic.channelMap {
-						commands = append(commands, nsq.Register(channel.topicName, channel.name))
-					}
-				}
-				topic.RUnlock()
-			}
-			n.RUnlock()
-
-			for _, cmd := range commands {
-				n.logf(LOG_INFO, "LOOKUPD(%s): %s", lookupPeer, cmd)
-				_, err := lookupPeer.Command(cmd)
-				if err != nil {
-					n.logf(LOG_ERROR, "LOOKUPD(%s): %s - %s", lookupPeer, cmd, err)
-					break
 				}
 			}
 		case <-n.optsNotificationChan:
