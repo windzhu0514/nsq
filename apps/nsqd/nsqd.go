@@ -16,9 +16,9 @@ import (
 	"github.com/BurntSushi/toml"
 	"github.com/judwhite/go-svc/svc"
 	"github.com/mreiferson/go-options"
-	"github.com/nsqio/nsq/internal/app"
-	"github.com/nsqio/nsq/internal/version"
 	"github.com/nsqio/nsq/nsqd"
+	"github.com/windzhu0514/nsq/internal/app"
+	"github.com/windzhu0514/nsq/internal/version"
 )
 
 type tlsRequiredOption int

@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/golang/snappy"
-	"github.com/nsqio/nsq/internal/http_api"
-	"github.com/nsqio/nsq/internal/test"
+	"github.com/windzhu0514/nsq/internal/http_api"
+	"github.com/windzhu0514/nsq/internal/test"
 )
 
 func TestStats(t *testing.T) {

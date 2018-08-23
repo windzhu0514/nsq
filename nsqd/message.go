@@ -41,8 +41,8 @@ func (m *Message) WriteTo(w io.Writer) (int64, error) {
 	var buf [10]byte
 	var total int64
 
-	binary.BigEndian.PutUint64(buf[:8], uint64(m.Timestamp))
-	binary.BigEndian.PutUint16(buf[8:10], uint16(m.Attempts))
+	binary.BigEndian.PutUint64(buf[:8], uint64(m.Timestamp))  // 按大端模式写入时间戳
+	binary.BigEndian.PutUint16(buf[8:10], uint16(m.Attempts)) // 按大端模式写入 Attempts（尝试次数？？？）
 
 	n, err := w.Write(buf[:])
 	total += int64(n)

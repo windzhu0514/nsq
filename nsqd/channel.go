@@ -11,9 +11,9 @@ import (
 	"time"
 
 	"github.com/nsqio/go-diskqueue"
-	"github.com/nsqio/nsq/internal/lg"
-	"github.com/nsqio/nsq/internal/pqueue"
-	"github.com/nsqio/nsq/internal/quantile"
+	"github.com/windzhu0514/nsq/internal/lg"
+	"github.com/windzhu0514/nsq/internal/pqueue"
+	"github.com/windzhu0514/nsq/internal/quantile"
 )
 
 type Consumer interface {
@@ -25,15 +25,19 @@ type Consumer interface {
 	Empty()
 }
 
+// Channel是NSQ channel的具体类型定义（同时也实现了Queue接口）
 // Channel represents the concrete type for a NSQ channel (and also
 // implements the Queue interface)
-//
+
+// 每个topic可以有多个channel,每个channel拥有自己单独的subscriber集合（也就是客户端 也就是消费者）
 // There can be multiple channels per topic, each with there own unique set
 // of subscribers (clients).
 //
+// Channels 维护所有的客户端和消息元数据，处理消息，超时，重新排序等。
 // Channels maintain all client and message metadata, orchestrating in-flight
 // messages, timeouts, requeuing, etc.
 type Channel struct {
+	// 在32位平台上，64位的atomic变量需要先进行正确的对齐
 	// 64bit atomic vars need to be first for proper alignment on 32bit platforms
 	requeueCount uint64
 	messageCount uint64
@@ -43,16 +47,16 @@ type Channel struct {
 
 	topicName string
 	name      string
-	ctx       *context
+	ctx       *context // 上下文信息（保存了一个NSQD变量指针）
 
 	backend BackendQueue
 
 	memoryMsgChan chan *Message
-	exitFlag      int32
+	exitFlag      int32 // 标识channel是否已关闭或者正在退出
 	exitMutex     sync.RWMutex
 
 	// state tracking
-	clients        map[int64]Consumer
+	clients        map[int64]Consumer // 连接到当前channel的所有客户端（消费者）
 	paused         int32
 	ephemeral      bool
 	deleteCallback func(*Channel)
@@ -62,11 +66,11 @@ type Channel struct {
 	e2eProcessingLatencyStream *quantile.Quantile
 
 	// TODO: these can be DRYd up
-	deferredMessages map[MessageID]*pqueue.Item
-	deferredPQ       pqueue.PriorityQueue
+	deferredMessages map[MessageID]*pqueue.Item // 分发失败等待重新分发的消息
+	deferredPQ       pqueue.PriorityQueue       // 分发失败等待分发的消息优先级队列
 	deferredMutex    sync.Mutex
-	inFlightMessages map[MessageID]*Message
-	inFlightPQ       inFlightPqueue
+	inFlightMessages map[MessageID]*Message // 正在处理中的消息
+	inFlightPQ       inFlightPqueue         // 正在处理中消息优先级队列
 	inFlightMutex    sync.Mutex
 }
 
@@ -91,14 +95,15 @@ func NewChannel(topicName string, channelName string, ctx *context,
 
 	c.initPQ()
 
-	if strings.HasSuffix(channelName, "#ephemeral") {
+	if strings.HasSuffix(channelName, "#ephemeral") { // 是否是临时的channel
 		c.ephemeral = true
-		c.backend = newDummyBackendQueue()
+		c.backend = newDummyBackendQueue() // 假的BackendQueue
 	} else {
 		dqLogf := func(level diskqueue.LogLevel, f string, args ...interface{}) {
 			opts := ctx.nsqd.getOpts()
 			lg.Logf(opts.Logger, opts.logLevel, lg.LogLevel(level), f, args...)
 		}
+		// 为了唯一性 自动包括了topic的名字
 		// backend names, for uniqueness, automatically include the topic...
 		backendName := getBackendName(topicName, channelName)
 		c.backend = diskqueue.New(
@@ -137,11 +142,13 @@ func (c *Channel) Exiting() bool {
 	return atomic.LoadInt32(&c.exitFlag) == 1
 }
 
+// Delete 清空并删除channel
 // Delete empties the channel and closes
 func (c *Channel) Delete() error {
 	return c.exit(true)
 }
 
+// Close 清空并关闭channel 不删除
 // Close cleanly closes the Channel
 func (c *Channel) Close() error {
 	return c.exit(false)
@@ -192,6 +199,7 @@ func (c *Channel) Empty() error {
 		client.Empty()
 	}
 
+	// 干什么用的
 	for {
 		select {
 		case <-c.memoryMsgChan:
@@ -204,6 +212,8 @@ finish:
 	return c.backend.Empty()
 }
 
+// flush 持久化所有在内存缓冲里的消息到backend
+// 这句话不知道什么意思，因为只会在channnel关闭（Close）是调用这个函数
 // flush persists all the messages in internal memory buffers to the backend
 // it does not drain inflight/deferred because it is only called in Close()
 func (c *Channel) flush() error {
@@ -214,6 +224,8 @@ func (c *Channel) flush() error {
 			c.name, len(c.memoryMsgChan), len(c.inFlightMessages), len(c.deferredMessages))
 	}
 
+	// 把内存缓冲中的消息写入backend
+	// memoryMsgChan不会被关闭 所以不能用for range
 	for {
 		select {
 		case msg := <-c.memoryMsgChan:
@@ -222,11 +234,13 @@ func (c *Channel) flush() error {
 				c.ctx.nsqd.logf(LOG_ERROR, "failed to write message to backend - %s", err)
 			}
 		default:
-			goto finish
+			goto finish // memoryMsgChan已没有消息
 		}
 	}
 
 finish:
+
+	// 把正在处理中的消息写入backend
 	c.inFlightMutex.Lock()
 	for _, msg := range c.inFlightMessages {
 		err := writeMessageToBackend(&msgBuf, msg, c.backend)
@@ -236,6 +250,7 @@ finish:
 	}
 	c.inFlightMutex.Unlock()
 
+	// 把延迟处理的消息写入backend
 	c.deferredMutex.Lock()
 	for _, item := range c.deferredMessages {
 		msg := item.Value.(*Message)
@@ -299,10 +314,11 @@ func (c *Channel) PutMessage(m *Message) error {
 	return nil
 }
 
+// 分发消息
 func (c *Channel) put(m *Message) error {
 	select {
 	case c.memoryMsgChan <- m:
-	default:
+	default: // 如果memoryMsgChan满了就会走default
 		b := bufferPoolGet()
 		err := writeMessageToBackend(b, m, c.backend)
 		bufferPoolPut(b)
@@ -316,11 +332,13 @@ func (c *Channel) put(m *Message) error {
 	return nil
 }
 
+// 添加一个延迟消息
 func (c *Channel) PutMessageDeferred(msg *Message, timeout time.Duration) {
 	atomic.AddUint64(&c.messageCount, 1)
 	c.StartDeferredTimeout(msg, timeout)
 }
 
+// TouchMessage 重新设置in-flight message的超时时间
 // TouchMessage resets the timeout for an in-flight message
 func (c *Channel) TouchMessage(clientID int64, id MessageID, clientMsgTimeout time.Duration) error {
 	msg, err := c.popInFlightMessage(clientID, id)
@@ -345,6 +363,7 @@ func (c *Channel) TouchMessage(clientID int64, id MessageID, clientMsgTimeout ti
 	return nil
 }
 
+// FinishMessage 丢弃一个in-flight message
 // FinishMessage successfully discards an in-flight message
 func (c *Channel) FinishMessage(clientID int64, id MessageID) error {
 	msg, err := c.popInFlightMessage(clientID, id)
@@ -429,6 +448,7 @@ func (c *Channel) StartInFlightTimeout(msg *Message, clientID int64, timeout tim
 	return nil
 }
 
+// StartDeferredTimeout 添加一个延迟消息到队列中
 func (c *Channel) StartDeferredTimeout(msg *Message, timeout time.Duration) error {
 	absTs := time.Now().Add(timeout).UnixNano()
 	item := &pqueue.Item{Value: msg, Priority: absTs}
@@ -514,12 +534,14 @@ func (c *Channel) popDeferredMessage(id MessageID) (*pqueue.Item, error) {
 	return item, nil
 }
 
+// 添加
 func (c *Channel) addToDeferredPQ(item *pqueue.Item) {
 	c.deferredMutex.Lock()
 	heap.Push(&c.deferredPQ, item)
 	c.deferredMutex.Unlock()
 }
 
+// 分发需要重新分发的消息
 func (c *Channel) processDeferredQueue(t int64) bool {
 	c.exitMutex.RLock()
 	defer c.exitMutex.RUnlock()
@@ -531,7 +553,7 @@ func (c *Channel) processDeferredQueue(t int64) bool {
 	dirty := false
 	for {
 		c.deferredMutex.Lock()
-		item, _ := c.deferredPQ.PeekAndShift(t)
+		item, _ := c.deferredPQ.PeekAndShift(t) // 取出最小优先级的元素
 		c.deferredMutex.Unlock()
 
 		if item == nil {
@@ -544,13 +566,14 @@ func (c *Channel) processDeferredQueue(t int64) bool {
 		if err != nil {
 			goto exit
 		}
-		c.put(msg)
+		c.put(msg) // 分发消息
 	}
 
 exit:
 	return dirty
 }
 
+// 分发消息
 func (c *Channel) processInFlightQueue(t int64) bool {
 	c.exitMutex.RLock()
 	defer c.exitMutex.RUnlock()

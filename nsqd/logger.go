@@ -1,7 +1,7 @@
 package nsqd
 
 import (
-	"github.com/nsqio/nsq/internal/lg"
+	"github.com/windzhu0514/nsq/internal/lg"
 )
 
 type Logger lg.Logger

@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/nsqio/go-nsq"
-	"github.com/nsqio/nsq/internal/clusterinfo"
-	"github.com/nsqio/nsq/internal/http_api"
+	"github.com/windzhu0514/nsq/internal/clusterinfo"
+	"github.com/windzhu0514/nsq/internal/http_api"
 )
 
 type TopicDiscoverer struct {

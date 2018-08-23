@@ -9,9 +9,10 @@ import (
 	"time"
 
 	"github.com/nsqio/go-nsq"
-	"github.com/nsqio/nsq/internal/version"
+	"github.com/windzhu0514/nsq/internal/version"
 )
 
+// 连接成功后发送nsqd客户端信息
 func connectCallback(n *NSQD, hostname string, syncTopicChan chan *lookupPeer) func(*lookupPeer) {
 	return func(lp *lookupPeer) {
 		ci := make(map[string]interface{})
@@ -50,8 +51,8 @@ func connectCallback(n *NSQD, hostname string, syncTopicChan chan *lookupPeer) f
 }
 
 func (n *NSQD) lookupLoop() {
-	var lookupPeers []*lookupPeer  // nsqlookupd 连接器
-	var lookupAddrs []string // nsqlookupd 地址
+	var lookupPeers []*lookupPeer // nsqlookupd 连接器
+	var lookupAddrs []string      // nsqlookupd 地址
 	syncTopicChan := make(chan *lookupPeer)
 	connect := true // 第一次先进行连接
 

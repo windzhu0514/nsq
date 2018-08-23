@@ -9,7 +9,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/nsqio/nsq/internal/lg"
+	"github.com/windzhu0514/nsq/internal/lg"
 )
 
 type Options struct {
@@ -21,12 +21,12 @@ type Options struct {
 	Logger    Logger
 	logLevel  lg.LogLevel // private, not really an option
 
-	TCPAddress               string        `flag:"tcp-address"`
-	HTTPAddress              string        `flag:"http-address"`
-	HTTPSAddress             string        `flag:"https-address"`
-	BroadcastAddress         string        `flag:"broadcast-address"`
-	NSQLookupdTCPAddresses   []string      `flag:"lookupd-tcp-address" cfg:"nsqlookupd_tcp_addresses"` // nsqlookupd
-	// 的地址
+	TCPAddress       string `flag:"tcp-address"`
+	HTTPAddress      string `flag:"http-address"`
+	HTTPSAddress     string `flag:"https-address"`
+	BroadcastAddress string `flag:"broadcast-address"`
+	// nsqlookupd 的地址
+	NSQLookupdTCPAddresses   []string      `flag:"lookupd-tcp-address" cfg:"nsqlookupd_tcp_addresses"`
 	AuthHTTPAddresses        []string      `flag:"auth-http-address" cfg:"auth_http_addresses"`
 	HTTPClientConnectTimeout time.Duration `flag:"http-client-connect-timeout" cfg:"http_client_connect_timeout"`
 	HTTPClientRequestTimeout time.Duration `flag:"http-client-request-timeout" cfg:"http_client_request_timeout"`

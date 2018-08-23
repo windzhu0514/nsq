@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/nsqio/go-nsq"
-	"github.com/nsqio/nsq/internal/lg"
+	"github.com/windzhu0514/nsq/internal/lg"
 )
 
 // 一个lookupPeer实例用来懒惰连接nsqlookupd和优雅的重连

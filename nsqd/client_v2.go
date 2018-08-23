@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/golang/snappy"
-	"github.com/nsqio/nsq/internal/auth"
+	"github.com/windzhu0514/nsq/internal/auth"
 )
 
 const defaultBufferSize = 16 * 1024
@@ -24,6 +24,7 @@ const (
 	stateClosing
 )
 
+// 认证数据
 type identifyDataV2 struct {
 	ClientID            string `json:"client_id"`
 	Hostname            string `json:"hostname"`
@@ -47,6 +48,7 @@ type identifyEvent struct {
 	MsgTimeout          time.Duration
 }
 
+// 客户端相关操作
 type clientV2 struct {
 	// 64bit atomic vars need to be first for proper alignment on 32bit platforms
 	ReadyCount    int64 // 就绪客户端数量
@@ -55,8 +57,8 @@ type clientV2 struct {
 	FinishCount   uint64
 	RequeueCount  uint64
 
-	writeLock sync.RWMutex
-	metaLock  sync.RWMutex
+	writeLock sync.RWMutex //
+	metaLock  sync.RWMutex //
 
 	ID        int64
 	ctx       *context
@@ -191,6 +193,7 @@ func (c *clientV2) Identify(data identifyDataV2) error {
 		MsgTimeout:          c.MsgTimeout,
 	}
 
+	// 收到就收到 收不到就算了
 	// update the client's message pump
 	select {
 	case c.IdentifyEventChan <- ie:

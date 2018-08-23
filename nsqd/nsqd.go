@@ -19,14 +19,14 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/nsqio/nsq/internal/clusterinfo"
-	"github.com/nsqio/nsq/internal/dirlock"
-	"github.com/nsqio/nsq/internal/http_api"
-	"github.com/nsqio/nsq/internal/lg"
-	"github.com/nsqio/nsq/internal/protocol"
-	"github.com/nsqio/nsq/internal/statsd"
-	"github.com/nsqio/nsq/internal/util"
-	"github.com/nsqio/nsq/internal/version"
+	"github.com/windzhu0514/nsq/internal/clusterinfo"
+	"github.com/windzhu0514/nsq/internal/dirlock"
+	"github.com/windzhu0514/nsq/internal/http_api"
+	"github.com/windzhu0514/nsq/internal/lg"
+	"github.com/windzhu0514/nsq/internal/protocol"
+	"github.com/windzhu0514/nsq/internal/statsd"
+	"github.com/windzhu0514/nsq/internal/util"
+	"github.com/windzhu0514/nsq/internal/version"
 )
 
 const (
@@ -250,7 +250,6 @@ func (n *NSQD) Main() {
 			http_api.Serve(n.httpsListener, httpsServer, "HTTPS", n.logf)
 		})
 	}
-
 
 	httpListener, err = net.Listen("tcp", n.getOpts().HTTPAddress)
 	if err != nil {

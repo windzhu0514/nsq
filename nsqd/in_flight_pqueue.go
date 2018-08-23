@@ -1,5 +1,6 @@
 package nsqd
 
+// 正在处理中的消息优先级队列
 type inFlightPqueue []*Message
 
 func newInFlightPqueue(capacity int) inFlightPqueue {
