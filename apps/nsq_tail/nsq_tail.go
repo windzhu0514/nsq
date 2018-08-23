@@ -107,7 +107,7 @@ func main() {
 
 	consumers := []*nsq.Consumer{}
 	for i := 0; i < len(topics); i += 1 {
-		fmt.Printf("Adding consumer for topic: %s\n", topics[i])
+		log.Printf("Adding consumer for topic: %s\n", topics[i])
 
 		consumer, err := nsq.NewConsumer(topics[i], *channel, cfg)
 		if err != nil {

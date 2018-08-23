@@ -21,12 +21,12 @@ type Options struct {
 	Logger    Logger
 	logLevel  lg.LogLevel // private, not really an option
 
-	TCPAddress       string `flag:"tcp-address"`
-	HTTPAddress      string `flag:"http-address"`
-	HTTPSAddress     string `flag:"https-address"`
-	BroadcastAddress string `flag:"broadcast-address"`
-	// nsqlookupd 的地址
-	NSQLookupdTCPAddresses   []string      `flag:"lookupd-tcp-address" cfg:"nsqlookupd_tcp_addresses"`
+	TCPAddress             string   `flag:"tcp-address"`
+	HTTPAddress            string   `flag:"http-address"`
+	HTTPSAddress           string   `flag:"https-address"`
+	BroadcastAddress       string   `flag:"broadcast-address"`
+	NSQLookupdTCPAddresses []string `flag:"lookupd-tcp-address" cfg:"nsqlookupd_tcp_addresses"` // nsqlookupd
+	// 的地址
 	AuthHTTPAddresses        []string      `flag:"auth-http-address" cfg:"auth_http_addresses"`
 	HTTPClientConnectTimeout time.Duration `flag:"http-client-connect-timeout" cfg:"http_client_connect_timeout"`
 	HTTPClientRequestTimeout time.Duration `flag:"http-client-request-timeout" cfg:"http_client_request_timeout"`
@@ -59,10 +59,11 @@ type Options struct {
 	MaxOutputBufferTimeout time.Duration `flag:"max-output-buffer-timeout"`
 
 	// statsd integration
-	StatsdAddress  string        `flag:"statsd-address"`
-	StatsdPrefix   string        `flag:"statsd-prefix"`
-	StatsdInterval time.Duration `flag:"statsd-interval"`
-	StatsdMemStats bool          `flag:"statsd-mem-stats"`
+	StatsdAddress       string        `flag:"statsd-address"`
+	StatsdPrefix        string        `flag:"statsd-prefix"`
+	StatsdInterval      time.Duration `flag:"statsd-interval"`
+	StatsdMemStats      bool          `flag:"statsd-mem-stats"`
+	StatsdUDPPacketSize int           `flag:"statsd-udp-packet-size"`
 
 	// e2e message latency
 	E2EProcessingLatencyWindowTime  time.Duration `flag:"e2e-processing-latency-window-time"`
@@ -131,9 +132,10 @@ func NewOptions() *Options {
 		MaxOutputBufferSize:    64 * 1024,
 		MaxOutputBufferTimeout: 1 * time.Second,
 
-		StatsdPrefix:   "nsq.%s",
-		StatsdInterval: 60 * time.Second,
-		StatsdMemStats: true,
+		StatsdPrefix:        "nsq.%s",
+		StatsdInterval:      60 * time.Second,
+		StatsdMemStats:      true,
+		StatsdUDPPacketSize: 508,
 
 		E2EProcessingLatencyWindowTime: time.Duration(10 * time.Minute),
 
