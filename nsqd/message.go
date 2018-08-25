@@ -19,7 +19,7 @@ type Message struct {
 	ID        MessageID
 	Body      []byte
 	Timestamp int64
-	Attempts  uint16
+	Attempts  uint16 // 消息发送给客户端的尝试次数
 
 	// for in-flight handling
 	deliveryTS time.Time
@@ -42,7 +42,7 @@ func (m *Message) WriteTo(w io.Writer) (int64, error) {
 	var total int64
 
 	binary.BigEndian.PutUint64(buf[:8], uint64(m.Timestamp))  // 按大端模式写入时间戳
-	binary.BigEndian.PutUint16(buf[8:10], uint16(m.Attempts)) // 按大端模式写入 Attempts（尝试次数？？？）
+	binary.BigEndian.PutUint16(buf[8:10], uint16(m.Attempts)) // 按大端模式写入 Attempts
 
 	n, err := w.Write(buf[:])
 	total += int64(n)

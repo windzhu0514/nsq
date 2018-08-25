@@ -60,17 +60,17 @@ type Channel struct {
 	paused         int32
 	ephemeral      bool
 	deleteCallback func(*Channel)
-	deleter        sync.Once
+	deleter        sync.Once // 只调用一次deleteCallback
 
 	// Stats tracking
 	e2eProcessingLatencyStream *quantile.Quantile
 
 	// TODO: these can be DRYd up
-	deferredMessages map[MessageID]*pqueue.Item // 分发失败等待重新分发的消息
-	deferredPQ       pqueue.PriorityQueue       // 分发失败等待分发的消息优先级队列
+	deferredMessages map[MessageID]*pqueue.Item // 保存延迟消息
+	deferredPQ       pqueue.PriorityQueue       // 延迟消息的优先级队列
 	deferredMutex    sync.Mutex
-	inFlightMessages map[MessageID]*Message // 正在处理中的消息
-	inFlightPQ       inFlightPqueue         // 正在处理中消息优先级队列
+	inFlightMessages map[MessageID]*Message // 正在投递的消息
+	inFlightPQ       inFlightPqueue         // 正在投递的消息的优先级队列
 	inFlightMutex    sync.Mutex
 }
 
@@ -332,13 +332,13 @@ func (c *Channel) put(m *Message) error {
 	return nil
 }
 
-// 添加一个延迟消息
+// 投递一个延迟消息
 func (c *Channel) PutMessageDeferred(msg *Message, timeout time.Duration) {
 	atomic.AddUint64(&c.messageCount, 1)
 	c.StartDeferredTimeout(msg, timeout)
 }
 
-// TouchMessage 重新设置in-flight message的超时时间
+// TouchMessage 重新设置in-flight message的优先级(超时时间)
 // TouchMessage resets the timeout for an in-flight message
 func (c *Channel) TouchMessage(clientID int64, id MessageID, clientMsgTimeout time.Duration) error {
 	msg, err := c.popInFlightMessage(clientID, id)
@@ -347,6 +347,7 @@ func (c *Channel) TouchMessage(clientID int64, id MessageID, clientMsgTimeout ti
 	}
 	c.removeFromInFlightPQ(msg)
 
+	// 设置超时时间
 	newTimeout := time.Now().Add(clientMsgTimeout)
 	if newTimeout.Sub(msg.deliveryTS) >=
 		c.ctx.nsqd.getOpts().MaxMsgTimeout {
@@ -354,7 +355,10 @@ func (c *Channel) TouchMessage(clientID int64, id MessageID, clientMsgTimeout ti
 		newTimeout = msg.deliveryTS.Add(c.ctx.nsqd.getOpts().MaxMsgTimeout)
 	}
 
+	// 重新设置优先级
 	msg.pri = newTimeout.UnixNano()
+
+	// 放入正在投递的消息字典和正在投递的消息优先级队列
 	err = c.pushInFlightMessage(msg)
 	if err != nil {
 		return err
@@ -430,6 +434,7 @@ func (c *Channel) RemoveClient(clientID int64) {
 	}
 	delete(c.clients, clientID)
 
+	// 客户端为0 并且channel是临时的 调用删除回调
 	if len(c.clients) == 0 && c.ephemeral == true {
 		go c.deleter.Do(func() { c.deleteCallback(c) })
 	}
@@ -448,7 +453,7 @@ func (c *Channel) StartInFlightTimeout(msg *Message, clientID int64, timeout tim
 	return nil
 }
 
-// StartDeferredTimeout 添加一个延迟消息到队列中
+// StartDeferredTimeout 添加一个延迟消息
 func (c *Channel) StartDeferredTimeout(msg *Message, timeout time.Duration) error {
 	absTs := time.Now().Add(timeout).UnixNano()
 	item := &pqueue.Item{Value: msg, Priority: absTs}
@@ -473,6 +478,7 @@ func (c *Channel) pushInFlightMessage(msg *Message) error {
 	return nil
 }
 
+// popInFlightMessage 从in-flight中原子性的移除一个消息
 // popInFlightMessage atomically removes a message from the in-flight dictionary
 func (c *Channel) popInFlightMessage(clientID int64, id MessageID) (*Message, error) {
 	c.inFlightMutex.Lock()
@@ -496,6 +502,7 @@ func (c *Channel) addToInFlightPQ(msg *Message) {
 	c.inFlightMutex.Unlock()
 }
 
+// 从InFlight优先级队列里移除消息
 func (c *Channel) removeFromInFlightPQ(msg *Message) {
 	c.inFlightMutex.Lock()
 	if msg.index == -1 {
@@ -507,6 +514,7 @@ func (c *Channel) removeFromInFlightPQ(msg *Message) {
 	c.inFlightMutex.Unlock()
 }
 
+// 保存延迟消息
 func (c *Channel) pushDeferredMessage(item *pqueue.Item) error {
 	c.deferredMutex.Lock()
 	// TODO: these map lookups are costly
@@ -534,7 +542,7 @@ func (c *Channel) popDeferredMessage(id MessageID) (*pqueue.Item, error) {
 	return item, nil
 }
 
-// 添加
+// 添加一个延迟消息到优先级队列
 func (c *Channel) addToDeferredPQ(item *pqueue.Item) {
 	c.deferredMutex.Lock()
 	heap.Push(&c.deferredPQ, item)
