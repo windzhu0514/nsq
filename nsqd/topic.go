@@ -226,6 +226,7 @@ func (t *Topic) Depth() int64 {
 	return int64(len(t.memoryMsgChan)) + t.backend.Depth()
 }
 
+// messagePump 从内存和后端队列选取消息 发送给这个topic的所有channel
 // messagePump selects over the in-memory and backend queue and
 // writes messages to every channel for this topic
 func (t *Topic) messagePump() {
@@ -236,6 +237,7 @@ func (t *Topic) messagePump() {
 	var memoryMsgChan chan *Message
 	var backendChan chan []byte
 
+	// 在Start()之前不传递消息，并且保证不阻塞Pause() or GetChannel()
 	// do not pass messages before Start(), but avoid blocking Pause() or GetChannel()
 	for {
 		select {
@@ -262,8 +264,8 @@ func (t *Topic) messagePump() {
 	// main message loop
 	for {
 		select {
-		case msg = <-memoryMsgChan:
-		case buf = <-backendChan:
+		case msg = <-memoryMsgChan: // 内存中读到消息
+		case buf = <-backendChan: // 内存中未读到消息 从后端读取一个消息
 			msg, err = decodeMessage(buf)
 			if err != nil {
 				t.ctx.nsqd.logf(LOG_ERROR, "failed to decode message - %s", err)
@@ -304,14 +306,19 @@ func (t *Topic) messagePump() {
 			// fastpath to avoid copy if its the first channel
 			// (the topic already created the first copy)
 			if i > 0 {
+				// Attempts 尝试次数为0 不用单独设置
 				chanMsg = NewMessage(msg.ID, msg.Body)
 				chanMsg.Timestamp = msg.Timestamp
 				chanMsg.deferred = msg.deferred
 			}
+
+			// 投递延迟消息
 			if chanMsg.deferred != 0 {
 				channel.PutMessageDeferred(chanMsg, chanMsg.deferred)
 				continue
 			}
+
+			// 投递一个消息
 			err := channel.PutMessage(chanMsg)
 			if err != nil {
 				t.ctx.nsqd.logf(LOG_ERROR,
