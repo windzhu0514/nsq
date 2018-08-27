@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/windzhu0514/nsq/internal/statsd"
-	"github.com/nsqio/nsq/internal/writers"
+	"github.com/windzhu0514/nsq/internal/writers"
 )
 
 type Uint64Slice []uint64

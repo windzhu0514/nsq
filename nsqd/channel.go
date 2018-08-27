@@ -10,7 +10,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/nsqio/go-diskqueue"
+	"github.com/windzhu0514/go-diskqueue"
 	"github.com/windzhu0514/nsq/internal/lg"
 	"github.com/windzhu0514/nsq/internal/pqueue"
 	"github.com/windzhu0514/nsq/internal/quantile"
@@ -62,7 +62,7 @@ type Channel struct {
 	deleteCallback func(*Channel)
 	deleter        sync.Once
 
-	// Stats tracking
+	// Stats tracking 统计跟踪
 	e2eProcessingLatencyStream *quantile.Quantile
 
 	// TODO: these can be DRYd up
@@ -165,6 +165,7 @@ func (c *Channel) exit(deleted bool) error {
 	if deleted {
 		c.ctx.nsqd.logf(LOG_INFO, "CHANNEL(%s): deleting", c.name)
 
+		// 我们真的要删除一个channel(不是程序退出时) 从lookupd里撤销注册
 		// since we are explicitly deleting a channel (not just at system exit time)
 		// de-register this from the lookupd
 		c.ctx.nsqd.Notify(c)
@@ -172,6 +173,7 @@ func (c *Channel) exit(deleted bool) error {
 		c.ctx.nsqd.logf(LOG_INFO, "CHANNEL(%s): closing", c.name)
 	}
 
+	// 强制关闭客户端连接
 	// this forceably closes client connections
 	c.RLock()
 	for _, client := range c.clients {
@@ -199,7 +201,7 @@ func (c *Channel) Empty() error {
 		client.Empty()
 	}
 
-	// 干什么用的
+	// 消费掉memoryMsgChan里所有内容
 	for {
 		select {
 		case <-c.memoryMsgChan:
@@ -213,7 +215,7 @@ finish:
 }
 
 // flush 持久化所有在内存缓冲里的消息到backend
-// 这句话不知道什么意思，因为只会在channnel关闭（Close）是调用这个函数
+// 函数不会排尽inflight/deferred 因为只会在channnel关闭（Close）里调用这个函数
 // flush persists all the messages in internal memory buffers to the backend
 // it does not drain inflight/deferred because it is only called in Close()
 func (c *Channel) flush() error {
@@ -264,6 +266,7 @@ finish:
 	return nil
 }
 
+// 内存消息channel和后端队里里还有多少个消息
 func (c *Channel) Depth() int64 {
 	return int64(len(c.memoryMsgChan)) + c.backend.Depth()
 }

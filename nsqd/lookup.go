@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/nsqio/go-nsq"
+	"github.com/windzhu0514/go-nsq"
 	"github.com/windzhu0514/nsq/internal/version"
 )
 
@@ -76,8 +76,8 @@ func connectCallback(n *NSQD, hostname string) func(*lookupPeer) {
 }
 
 func (n *NSQD) lookupLoop() {
-	var lookupPeers []*lookupPeer // nsqlookupd Á¬½ÓÆ÷
-	var lookupAddrs []string      // nsqlookupd µØÖ·
+	var lookupPeers []*lookupPeer // nsqlookupd ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+	var lookupAddrs []string      // nsqlookupd ï¿½ï¿½Ö·
 	connect := true
 
 	hostname, err := os.Hostname()

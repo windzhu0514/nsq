@@ -8,7 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/nsqio/go-diskqueue"
+	diskqueue "github.com/windzhu0514/go-diskqueue"
 	"github.com/windzhu0514/nsq/internal/lg"
 	"github.com/windzhu0514/nsq/internal/quantile"
 	"github.com/windzhu0514/nsq/internal/util"

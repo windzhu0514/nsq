@@ -7,7 +7,7 @@ import (
 	"net"
 	"time"
 
-	"github.com/nsqio/go-nsq"
+	"github.com/windzhu0514/go-nsq"
 	"github.com/windzhu0514/nsq/internal/lg"
 )
 
