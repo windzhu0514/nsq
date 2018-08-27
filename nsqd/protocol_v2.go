@@ -316,11 +316,11 @@ func (p *protocolV2) messagePump(client *clientV2, startedChan chan bool) {
 				goto exit
 			}
 			flushed = false
-		case msg := <-memoryMsgChan:
+		case msg := <-memoryMsgChan: // 向客户端发送一个消息
 			if sampleRate > 0 && rand.Int31n(100) > sampleRate {
 				continue
 			}
-			msg.Attempts++
+			msg.Attempts++ // 尝试次数+1
 
 			subChannel.StartInFlightTimeout(msg, client.ID, msgTimeout)
 			client.SendingMessage()

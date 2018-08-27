@@ -63,7 +63,7 @@ type NSQD struct {
 
 	poolSize int
 
-	notifyChan           chan interface{}
+	notifyChan           chan interface{} // 通知lookupd top channel的创建和销毁
 	optsNotificationChan chan struct{}
 	exitChan             chan int
 	waitGroup            util.WaitGroupWrapper
@@ -491,7 +491,7 @@ func (n *NSQD) GetTopic(topicName string) *Topic {
 	}
 
 	n.Lock()
-
+	// 为什么再次检查
 	t, ok = n.topicMap[topicName]
 	if ok {
 		n.Unlock()
@@ -508,11 +508,13 @@ func (n *NSQD) GetTopic(topicName string) *Topic {
 	n.logf(LOG_INFO, "TOPIC(%s): created", t.name)
 	// topic is created but messagePump not yet started
 
+	// 如果启动时正在加载元数据，表示还没有lookupd连接，topic在加载完毕后再启动
 	// if loading metadata at startup, no lookupd connections yet, topic started after load
 	if atomic.LoadInt32(&n.isLoading) == 1 {
 		return t
 	}
 
+	// 如果使用了lookupd，获取并创建所有订阅该topic的channel,这样可以确保收到的任何消息都缓冲到正确的channel
 	// if using lookupd, make a blocking call to get the topics, and immediately create them.
 	// this makes sure that any message received is buffered to the right channels
 	lookupdHTTPAddrs := n.lookupdHTTPAddrs()

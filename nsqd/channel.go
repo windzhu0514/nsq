@@ -52,8 +52,8 @@ type Channel struct {
 	backend BackendQueue
 
 	memoryMsgChan chan *Message
-	exitFlag      int32 // 标识channel是否已关闭或者正在退出
-	exitMutex     sync.RWMutex
+	exitFlag      int32        // 标识channel是否已关闭或者正在退出
+	exitMutex     sync.RWMutex // exitFlag是原子操作 为什么还需要读写互斥量
 
 	// state tracking
 	clients        map[int64]Consumer // 连接到当前channel的所有客户端（消费者）
@@ -322,6 +322,7 @@ func (c *Channel) put(m *Message) error {
 	select {
 	case c.memoryMsgChan <- m:
 	default: // 如果memoryMsgChan满了就会走default
+		// 写入后端
 		b := bufferPoolGet()
 		err := writeMessageToBackend(b, m, c.backend)
 		bufferPoolPut(b)
