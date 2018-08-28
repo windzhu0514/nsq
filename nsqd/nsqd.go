@@ -94,7 +94,7 @@ func New(opts *Options) *NSQD {
 
 	n.lookupPeers.Store([]*lookupPeer{})
 
-	n.swapOpts(opts)
+	n.swapOpts(opts) // 存储配置选项
 	n.errValue.Store(errStore{})
 
 	var err error
@@ -104,6 +104,7 @@ func New(opts *Options) *NSQD {
 		os.Exit(1)
 	}
 
+	// 锁定数据目录 windows下无操作
 	err = n.dl.Lock()
 	if err != nil {
 		n.logf(LOG_FATAL, "--data-path=%s in use (possibly by another instance of nsqd)", dataPath)
@@ -302,6 +303,7 @@ func writeSyncFile(fn string, data []byte) error {
 	return err
 }
 
+// 加载元数据 根据数据恢复topics和topic对应的channels
 func (n *NSQD) LoadMetadata() error {
 	atomic.StoreInt32(&n.isLoading, 1)
 	defer atomic.StoreInt32(&n.isLoading, 0)
@@ -363,6 +365,7 @@ func (n *NSQD) LoadMetadata() error {
 	return nil
 }
 
+// 保存topics和对应的channels信息
 func (n *NSQD) PersistMetadata() error {
 	// persist metadata about what topics/channels we have, across restarts
 	fileName := newMetadataFile(n.getOpts())

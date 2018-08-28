@@ -20,7 +20,7 @@ func NewDeadlineTransport(connectTimeout time.Duration, requestTimeout time.Dura
 		DialContext: (&net.Dialer{
 			Timeout:   connectTimeout,
 			KeepAlive: 30 * time.Second,
-			DualStack: true,
+			DualStack: true, // 兼容ipv4 ipv6
 		}).DialContext,
 		ResponseHeaderTimeout: requestTimeout,
 		MaxIdleConns:          100,

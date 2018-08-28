@@ -36,9 +36,10 @@ func (l ErrList) Errors() []error {
 
 type ClusterInfo struct {
 	log    lg.AppLogFunc
-	client *http_api.Client
+	client *http_api.Client // http.Client nsqd作为一个客户端和其他服务通信
 }
 
+// 创建一个集群信息
 func New(log lg.AppLogFunc, client *http_api.Client) *ClusterInfo {
 	return &ClusterInfo{
 		log:    log,
