@@ -553,7 +553,6 @@ func (c *Channel) addToDeferredPQ(item *pqueue.Item) {
 	c.deferredMutex.Unlock()
 }
 
-// 分发需要重新分发的消息
 func (c *Channel) processDeferredQueue(t int64) bool {
 	c.exitMutex.RLock()
 	defer c.exitMutex.RUnlock()
@@ -585,7 +584,6 @@ exit:
 	return dirty
 }
 
-// 分发消息
 func (c *Channel) processInFlightQueue(t int64) bool {
 	c.exitMutex.RLock()
 	defer c.exitMutex.RUnlock()

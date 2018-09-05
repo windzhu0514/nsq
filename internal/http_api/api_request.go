@@ -45,6 +45,7 @@ func NewClient(tlsConfig *tls.Config, connectTimeout time.Duration, requestTimeo
 	}
 }
 
+// get请求 如果返回403或者并且第一次是http请求 换https重试
 // GETV1 is a helper function to perform a V1 HTTP request
 // and parse our NSQ daemon's expected response format, with deadlines.
 func (c *Client) GETV1(endpoint string, v interface{}) error {
