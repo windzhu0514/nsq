@@ -28,17 +28,17 @@ const (
 type identifyDataV2 struct {
 	ClientID            string `json:"client_id"`
 	Hostname            string `json:"hostname"`
-	HeartbeatInterval   int    `json:"heartbeat_interval"`
-	OutputBufferSize    int    `json:"output_buffer_size"`
+	HeartbeatInterval   int    `json:"heartbeat_interval"` // 心跳间隔 毫秒
+	OutputBufferSize    int    `json:"output_buffer_size"` // 当 nsqd 写到这个客户端时将会用到的缓存的大小 字节
 	OutputBufferTimeout int    `json:"output_buffer_timeout"`
 	FeatureNegotiation  bool   `json:"feature_negotiation"`
 	TLSv1               bool   `json:"tls_v1"`
-	Deflate             bool   `json:"deflate"`
-	DeflateLevel        int    `json:"deflate_level"`
-	Snappy              bool   `json:"snappy"`
-	SampleRate          int32  `json:"sample_rate"`
-	UserAgent           string `json:"user_agent"`
-	MsgTimeout          int    `json:"msg_timeout"`
+	Deflate             bool   `json:"deflate"`       // 允许 deflate 压缩这次连接
+	DeflateLevel        int    `json:"deflate_level"` // deflate 压缩级别
+	Snappy              bool   `json:"snappy"`        // 允许 snappy 压缩这次连接
+	SampleRate          int32  `json:"sample_rate"`   // 消息接收率
+	UserAgent           string `json:"user_agent"`    // 客户端的代理
+	MsgTimeout          int    `json:"msg_timeout"`   // 配置服务端发送消息给客户端的超时时间
 }
 
 type identifyEvent struct {
@@ -196,7 +196,7 @@ func (c *clientV2) Identify(data identifyDataV2) error {
 		MsgTimeout:          c.MsgTimeout,
 	}
 
-	// 收到就收到 收不到就算了
+	// 能发就发 发不了就算了
 	// update the client's message pump
 	select {
 	case c.IdentifyEventChan <- ie:

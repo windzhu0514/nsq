@@ -38,10 +38,13 @@ func (p *protocolV2) IOLoop(conn net.Conn) error {
 	var line []byte
 	var zeroTime time.Time
 
+	// 客户端序列id加1 生成新的客户端id
 	clientID := atomic.AddInt64(&p.ctx.nsqd.clientIDSequence, 1)
 	client := newClientV2(clientID, conn, p.ctx)
 	p.ctx.nsqd.AddClient(client.ID, client)
 
+	// 同步启动messagePump，保证messagePump有机会初始化从客户端得来的goroutine本地状态，
+	// 并且避免和IDENTIFY（客户端可以通过IDENTIFY改变或者禁用一些属性）的潜在竞争。
 	// synchronize the startup of messagePump in order
 	// to guarantee that it gets a chance to initialize
 	// goroutine local state derived from client attributes
@@ -52,12 +55,14 @@ func (p *protocolV2) IOLoop(conn net.Conn) error {
 	<-messagePumpStartedChan
 
 	for {
+		// 设置连接的读取超时时间
 		if client.HeartbeatInterval > 0 {
 			client.SetReadDeadline(time.Now().Add(client.HeartbeatInterval * 2))
 		} else {
 			client.SetReadDeadline(zeroTime)
 		}
 
+		// ReadSlice不会为每个请求的数据分配空间，也就是说返回的slice只在下次调用ReadSlice前有效
 		// ReadSlice does not allocate new space for the data each request
 		// ie. the returned slice is only valid until the next call to it
 		line, err = client.Reader.ReadSlice('\n')
@@ -164,7 +169,9 @@ func (p *protocolV2) Send(client *clientV2, frameType int32, data []byte) error 
 	return err
 }
 
+// 执行客户端命令
 func (p *protocolV2) Exec(client *clientV2, params [][]byte) ([]byte, error) {
+	// line只要有长度 split后结果至少有一个元素 就不用检查下标了
 	if bytes.Equal(params[0], []byte("IDENTIFY")) {
 		return p.IDENTIFY(client, params)
 	}
@@ -199,6 +206,7 @@ func (p *protocolV2) Exec(client *clientV2, params [][]byte) ([]byte, error) {
 	return nil, protocol.NewFatalClientErr(nil, "E_INVALID", fmt.Sprintf("invalid command %s", params[0]))
 }
 
+// 向客户端分发消息
 func (p *protocolV2) messagePump(client *clientV2, startedChan chan bool) {
 	var err error
 	var memoryMsgChan chan *Message
@@ -352,6 +360,7 @@ func (p *protocolV2) IDENTIFY(client *clientV2, params [][]byte) ([]byte, error)
 		return nil, protocol.NewFatalClientErr(nil, "E_INVALID", "cannot IDENTIFY in current state")
 	}
 
+	// 消息body的长度
 	bodyLen, err := readLen(client.Reader, client.lenSlice)
 	if err != nil {
 		return nil, protocol.NewFatalClientErr(err, "E_BAD_BODY", "IDENTIFY failed to read body size")
@@ -373,6 +382,7 @@ func (p *protocolV2) IDENTIFY(client *clientV2, params [][]byte) ([]byte, error)
 		return nil, protocol.NewFatalClientErr(err, "E_BAD_BODY", "IDENTIFY failed to read body")
 	}
 
+	// body是个包含生产者信息的结构体
 	// body is a json structure with producer information
 	var identifyData identifyDataV2
 	err = json.Unmarshal(body, &identifyData)
@@ -382,11 +392,13 @@ func (p *protocolV2) IDENTIFY(client *clientV2, params [][]byte) ([]byte, error)
 
 	p.ctx.nsqd.logf(LOG_DEBUG, "PROTOCOL(V2): [%s] %+v", client, identifyData)
 
+	// 保存数据
 	err = client.Identify(identifyData)
 	if err != nil {
 		return nil, protocol.NewFatalClientErr(err, "E_BAD_BODY", "IDENTIFY "+err.Error())
 	}
 
+	// 如果客户端不需要 特性协商 直接返回ok
 	// bail out early if we're not negotiating features
 	if !identifyData.FeatureNegotiation {
 		return okBytes, nil

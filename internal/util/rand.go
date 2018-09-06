@@ -4,6 +4,7 @@ import (
 	"math/rand"
 )
 
+// 打乱0-quantity所有数字的顺序
 func UniqRands(quantity int, maxval int) []int {
 	if maxval < quantity {
 		quantity = maxval

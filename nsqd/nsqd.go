@@ -44,7 +44,7 @@ type Client interface {
 
 type NSQD struct {
 	// 64bit atomic vars need to be first for proper alignment on 32bit platforms
-	clientIDSequence int64
+	clientIDSequence int64 // 消费者客户端序列id
 
 	sync.RWMutex
 
@@ -262,10 +262,12 @@ func (n *NSQD) Main() {
 		}
 	}
 
+	// tcp接口
 	tcpServer := &tcpServer{ctx: ctx}
 	n.waitGroup.Wrap(func() {
 		protocol.TCPServer(n.tcpListener, tcpServer, n.logf)
 	})
+
 	httpServer := newHTTPServer(ctx, false, n.getOpts().TLSRequired == TLSRequired)
 	n.waitGroup.Wrap(func() {
 		http_api.Serve(n.httpListener, httpServer, "HTTP", n.logf)
@@ -638,6 +640,16 @@ func (n *NSQD) queueScanWorker(workCh chan *Channel, responseCh chan bool, close
 		}
 	}
 }
+
+// queueScanLoop 运行在一个单独的goroutine,处理in-flight和deferred优先级队列。
+// 通过管理一个queueScanWorker池(最大可配置为QueueScanWorkerPoolMax，默认大小为4)并发的处理channels
+
+// 使用Redis的probabilistic expiration算法：每隔QueueScanInterval（默认100ms）从局部的
+// list（每隔QueueScanRefreshInterval（默认5秒）时间刷新）中随机选取QueueScanSelectionCount（默认20）个channel
+
+// 如果其中一个队列有工作要做，则该channel被视为"dirty"
+
+// 如果选取的channels中有QueueScanDirtyPercent（默认25%）是dirty,直接进行下一次循环而不sleep
 
 // queueScanLoop runs in a single goroutine to process in-flight and deferred
 // priority queues. It manages a pool of queueScanWorker (configurable max of

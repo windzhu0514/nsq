@@ -320,7 +320,7 @@ func (c *Channel) PutMessage(m *Message) error {
 // 分发消息
 func (c *Channel) put(m *Message) error {
 	select {
-	case c.memoryMsgChan <- m:
+	case c.memoryMsgChan <- m: // opts.MemQueueSize
 	default: // 如果memoryMsgChan满了就会走default
 		// 写入后端
 		b := bufferPoolGet()
@@ -342,7 +342,7 @@ func (c *Channel) PutMessageDeferred(msg *Message, timeout time.Duration) {
 	c.StartDeferredTimeout(msg, timeout)
 }
 
-// TouchMessage 重新设置in-flight message的优先级(超时时间)
+// TouchMessage 重新设置in-flight message的超时时间(增加了优先级)
 // TouchMessage resets the timeout for an in-flight message
 func (c *Channel) TouchMessage(clientID int64, id MessageID, clientMsgTimeout time.Duration) error {
 	msg, err := c.popInFlightMessage(clientID, id)
@@ -385,6 +385,7 @@ func (c *Channel) FinishMessage(clientID int64, id MessageID) error {
 	return nil
 }
 
+// 根据timeout重新分发消息 延迟时间为0 立即分发 延迟时间大于0 放入延迟消息队列
 // RequeueMessage requeues a message based on `time.Duration`, ie:
 //
 // `timeoutMs` == 0 - requeue a message immediately
@@ -438,7 +439,7 @@ func (c *Channel) RemoveClient(clientID int64) {
 	}
 	delete(c.clients, clientID)
 
-	// 客户端为0 并且channel是临时的 调用删除回调
+	// 没有客户端并且channel是临时的 调用删除回调
 	if len(c.clients) == 0 && c.ephemeral == true {
 		go c.deleter.Do(func() { c.deleteCallback(c) })
 	}
