@@ -62,7 +62,7 @@ func (pq *inFlightPqueue) Remove(i int) *Message {
 	return x
 }
 
-// 如果时间戳比max大（还没到时间）无操作 等于或者小于max 弹出第一个节点
+// PeekAndShift 判断优先级队列第一个节点的消息是否已经超时 <=max 说明已经超时
 func (pq *inFlightPqueue) PeekAndShift(max int64) (*Message, int64) {
 	if len(*pq) == 0 {
 		return nil, 0

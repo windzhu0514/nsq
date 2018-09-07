@@ -54,7 +54,7 @@ type Options struct {
 
 	// client overridable configuration options
 	MaxHeartbeatInterval   time.Duration `flag:"max-heartbeat-interval"`
-	MaxRdyCount            int64         `flag:"max-rdy-count"`
+	MaxRdyCount            int64         `flag:"max-rdy-count"` // 一个client最大的ready次数
 	MaxOutputBufferSize    int64         `flag:"max-output-buffer-size"`
 	MaxOutputBufferTimeout time.Duration `flag:"max-output-buffer-timeout"`
 

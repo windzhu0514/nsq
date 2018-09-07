@@ -69,8 +69,8 @@ type Channel struct {
 	deferredMessages map[MessageID]*pqueue.Item // 保存延迟消息
 	deferredPQ       pqueue.PriorityQueue       // 延迟消息的优先级队列
 	deferredMutex    sync.Mutex
-	inFlightMessages map[MessageID]*Message // 正在投递的消息
-	inFlightPQ       inFlightPqueue         // 正在投递的消息的优先级队列
+	inFlightMessages map[MessageID]*Message // 正在投递但还没确认投递成功
+	inFlightPQ       inFlightPqueue         // 正在投递但还没确认投递成功的优先级队列
 	inFlightMutex    sync.Mutex
 }
 
@@ -416,6 +416,7 @@ func (c *Channel) RequeueMessage(clientID int64, id MessageID, timeout time.Dura
 	return c.StartDeferredTimeout(msg, timeout)
 }
 
+// 客户端订阅时添加
 // AddClient adds a client to the Channel's client list
 func (c *Channel) AddClient(clientID int64, client Consumer) {
 	c.Lock()
@@ -585,6 +586,7 @@ exit:
 	return dirty
 }
 
+// 检查当前channel的正在投递消息队里的第一个消息是否超时
 func (c *Channel) processInFlightQueue(t int64) bool {
 	c.exitMutex.RLock()
 	defer c.exitMutex.RUnlock()
@@ -599,21 +601,22 @@ func (c *Channel) processInFlightQueue(t int64) bool {
 		msg, _ := c.inFlightPQ.PeekAndShift(t)
 		c.inFlightMutex.Unlock()
 
-		if msg == nil {
+		if msg == nil { // 没有超时的消息
 			goto exit
 		}
 		dirty = true
 
+		// 删除超时的消息
 		_, err := c.popInFlightMessage(msg.clientID, msg.ID)
 		if err != nil {
 			goto exit
 		}
-		atomic.AddUint64(&c.timeoutCount, 1)
+		atomic.AddUint64(&c.timeoutCount, 1) // 增加超时消息计数
 		c.RLock()
 		client, ok := c.clients[msg.clientID]
 		c.RUnlock()
 		if ok {
-			client.TimedOutMessage()
+			client.TimedOutMessage() //clientV2.TimedOutMessage
 		}
 		c.put(msg)
 	}

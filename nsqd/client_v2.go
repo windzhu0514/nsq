@@ -359,6 +359,7 @@ func (c *clientV2) Empty() {
 	c.tryUpdateReadyState()
 }
 
+// 向客户端发送了一个消息 增加消息计数
 func (c *clientV2) SendingMessage() {
 	atomic.AddInt64(&c.InFlightCount, 1)
 	atomic.AddUint64(&c.MessageCount, 1)
@@ -370,6 +371,7 @@ func (c *clientV2) PublishedMessage(topic string, count uint64) {
 	c.metaLock.Unlock()
 }
 
+// 清理了一个channel里的超时消息 减少消息计算
 func (c *clientV2) TimedOutMessage() {
 	atomic.AddInt64(&c.InFlightCount, -1)
 	c.tryUpdateReadyState()

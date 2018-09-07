@@ -592,6 +592,8 @@ func (n *NSQD) channels() []*Channel {
 	return channels
 }
 
+// 根据channel数量和配置确定 idealPoolSize 的大小
+// 创建idealPoolSize个queueScanWorker
 // resizePool adjusts the size of the pool of queueScanWorker goroutines
 //
 // 	1 <= pool <= min(num * 0.25, QueueScanWorkerPoolMax)
@@ -604,11 +606,12 @@ func (n *NSQD) resizePool(num int, workCh chan *Channel, responseCh chan bool, c
 		idealPoolSize = n.getOpts().QueueScanWorkerPoolMax
 	}
 	for {
+		// n.poolSize 初始为0
 		if idealPoolSize == n.poolSize {
 			break
 		} else if idealPoolSize < n.poolSize {
-			// contract
-			closeCh <- 1
+			// contract  // 收缩
+			closeCh <- 1 // 关闭一个queueScanWorker closeCh是非缓冲channel 发送一个所有queueScanWorker去抢
 			n.poolSize--
 		} else {
 			// expand
