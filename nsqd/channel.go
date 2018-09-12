@@ -371,7 +371,7 @@ func (c *Channel) TouchMessage(clientID int64, id MessageID, clientMsgTimeout ti
 	return nil
 }
 
-// FinishMessage 丢弃一个in-flight message
+// FinishMessage 消息已成功发送 删除消息
 // FinishMessage successfully discards an in-flight message
 func (c *Channel) FinishMessage(clientID int64, id MessageID) error {
 	msg, err := c.popInFlightMessage(clientID, id)
@@ -579,7 +579,7 @@ func (c *Channel) processDeferredQueue(t int64) bool {
 		if err != nil {
 			goto exit
 		}
-		c.put(msg) // 分发消息
+		c.put(msg) // 重新投递消息
 	}
 
 exit:
@@ -604,7 +604,7 @@ func (c *Channel) processInFlightQueue(t int64) bool {
 		if msg == nil { // 没有超时的消息
 			goto exit
 		}
-		dirty = true
+		dirty = true // 如果有超时的消息 标记为dirty
 
 		// 删除超时的消息
 		_, err := c.popInFlightMessage(msg.clientID, msg.ID)
@@ -616,9 +616,9 @@ func (c *Channel) processInFlightQueue(t int64) bool {
 		client, ok := c.clients[msg.clientID]
 		c.RUnlock()
 		if ok {
-			client.TimedOutMessage() //clientV2.TimedOutMessage
+			client.TimedOutMessage() //clientV2.TimedOutMessage 告诉client 有一个消息超时了
 		}
-		c.put(msg)
+		c.put(msg) // 重新投递消息
 	}
 
 exit:

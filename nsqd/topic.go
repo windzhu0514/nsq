@@ -204,6 +204,7 @@ func (t *Topic) PutMessages(msgs []*Message) error {
 	return nil
 }
 
+// 发布一个消息到队列
 func (t *Topic) put(m *Message) error {
 	select {
 	case t.memoryMsgChan <- m:

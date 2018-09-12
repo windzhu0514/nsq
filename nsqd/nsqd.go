@@ -470,7 +470,7 @@ func (n *NSQD) GetTopic(topicName string) *Topic {
 	}
 
 	n.Lock()
-	// 为什么再次检查
+	// 为什么再次检查 解锁加锁的过程中 可能已经有新的topic加了进来
 	t, ok = n.topicMap[topicName]
 	if ok {
 		n.Unlock()
@@ -676,12 +676,12 @@ func (n *NSQD) queueScanLoop() {
 	refreshTicker := time.NewTicker(n.getOpts().QueueScanRefreshInterval)
 
 	channels := n.channels()
-	n.resizePool(len(channels), workCh, responseCh, closeCh)
+	n.resizePool(len(channels), workCh, responseCh, closeCh) // 调整检查goroutine的数量
 
 	for {
 		select {
 		case <-workTicker.C:
-			if len(channels) == 0 {
+			if len(channels) == 0 { // channls为空不再进行下面的检查
 				continue
 			}
 		case <-refreshTicker.C:
@@ -698,10 +698,11 @@ func (n *NSQD) queueScanLoop() {
 		}
 
 	loop:
-		for _, i := range util.UniqRands(num, len(channels)) {
-			workCh <- channels[i]
+		for _, i := range util.UniqRands(num, len(channels)) { // 从channels中随机选出num个channel
+			workCh <- channels[i] // num <= len(workCh) 循环不会阻塞
 		}
 
+		// 统计超时消息数量
 		numDirty := 0
 		for i := 0; i < num; i++ {
 			if <-responseCh {
@@ -709,6 +710,7 @@ func (n *NSQD) queueScanLoop() {
 			}
 		}
 
+		// 超时消息的占比过大 继续检查不再等待
 		if float64(numDirty)/float64(num) > n.getOpts().QueueScanDirtyPercent {
 			goto loop
 		}
@@ -716,9 +718,9 @@ func (n *NSQD) queueScanLoop() {
 
 exit:
 	n.logf(LOG_INFO, "QUEUESCAN: closing")
-	close(closeCh)
-	workTicker.Stop()
-	refreshTicker.Stop()
+	close(closeCh)       // 结束所有的queueScanWorker
+	workTicker.Stop()    // 定时器处于阻塞状态 结束定时器
+	refreshTicker.Stop() // 定时器处于阻塞状态 结束定时器
 }
 
 func buildTLSConfig(opts *Options) (*tls.Config, error) {

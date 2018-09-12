@@ -116,6 +116,7 @@ func (p *protocolV2) IOLoop(conn net.Conn) error {
 		}
 	}
 
+	// 连接断开
 	p.ctx.nsqd.logf(LOG_INFO, "PROTOCOL(V2): [%s] exiting ioloop", client)
 	conn.Close()
 	close(client.ExitChan)
@@ -144,9 +145,11 @@ func (p *protocolV2) SendMessage(client *clientV2, msg *Message) error {
 	return nil
 }
 
+// 向客户端发送数据
 func (p *protocolV2) Send(client *clientV2, frameType int32, data []byte) error {
 	client.writeLock.Lock()
 
+	// 有心跳间隔设置时 超时时间设置为心跳间隔
 	var zeroTime time.Time
 	if client.HeartbeatInterval > 0 {
 		client.SetWriteDeadline(time.Now().Add(client.HeartbeatInterval))
@@ -211,7 +214,7 @@ func (p *protocolV2) messagePump(client *clientV2, startedChan chan bool) {
 	var err error
 	var memoryMsgChan chan *Message
 	var backendMsgChan chan []byte
-	var subChannel *Channel
+	var subChannel *Channel // 该客户端订阅成功的Channel
 	// NOTE: `flusherChan` is used to bound message latency for
 	// the pathological case of a channel on a low volume topic
 	// with >1 clients having >1 RDY counts
@@ -223,7 +226,7 @@ func (p *protocolV2) messagePump(client *clientV2, startedChan chan bool) {
 	outputBufferTicker := time.NewTicker(client.OutputBufferTimeout)
 	heartbeatTicker := time.NewTicker(client.HeartbeatInterval)
 	heartbeatChan := heartbeatTicker.C
-	msgTimeout := client.MsgTimeout
+	msgTimeout := client.MsgTimeout // 消息超时时间 消息从发送到成功接收的时间 由配置和客户端上发的值决定
 
 	// v2 opportunistically buffers data to clients to reduce write system calls
 	// we force flush in two cases:
@@ -245,7 +248,7 @@ func (p *protocolV2) messagePump(client *clientV2, startedChan chan bool) {
 			flusherChan = nil
 			// force flush
 			client.writeLock.Lock()
-			err = client.Flush()
+			err = client.Flush() // TODO：???
 			client.writeLock.Unlock()
 			if err != nil {
 				goto exit
@@ -277,14 +280,15 @@ func (p *protocolV2) messagePump(client *clientV2, startedChan chan bool) {
 				goto exit
 			}
 			flushed = true
-		case <-client.ReadyStateChan:
-		case subChannel = <-subEventChan:
+		case <-client.ReadyStateChan: // TODO:
+		case subChannel = <-subEventChan: // SUB 操作已完成
 			// you can't SUB anymore
-			subEventChan = nil
-		case identifyData := <-identifyEventChan:
+			subEventChan = nil // 当前客户端不能再重复订阅了
+		case identifyData := <-identifyEventChan: // IDENTIFY 操作已完成
 			// you can't IDENTIFY anymore
 			identifyEventChan = nil
 
+			// 参数有变 重新开启定时器
 			outputBufferTicker.Stop()
 			if identifyData.OutputBufferTimeout > 0 {
 				outputBufferTicker = time.NewTicker(identifyData.OutputBufferTimeout)
@@ -302,12 +306,13 @@ func (p *protocolV2) messagePump(client *clientV2, startedChan chan bool) {
 			}
 
 			msgTimeout = identifyData.MsgTimeout
-		case <-heartbeatChan:
+		case <-heartbeatChan: // 心跳检测 发送失败结束消息循环
 			err = p.Send(client, frameTypeResponse, heartbeatBytes)
 			if err != nil {
 				goto exit
 			}
-		case b := <-backendMsgChan:
+		case b := <-backendMsgChan: // 备份消息不为空
+			// 按照百分比发送消息给客户端 实现负载均衡
 			if sampleRate > 0 && rand.Int31n(100) > sampleRate {
 				continue
 			}
@@ -319,19 +324,21 @@ func (p *protocolV2) messagePump(client *clientV2, startedChan chan bool) {
 			}
 			msg.Attempts++
 
-			subChannel.StartInFlightTimeout(msg, client.ID, msgTimeout)
+			subChannel.StartInFlightTimeout(msg, client.ID, msgTimeout) // 发送给其他订阅了该channel的client
 			client.SendingMessage()
-			err = p.SendMessage(client, msg)
+			err = p.SendMessage(client, msg) // 发送给当前的client
 			if err != nil {
 				goto exit
 			}
 			flushed = false
-		case msg := <-memoryMsgChan: // 向客户端发送一个消息
+		case msg := <-memoryMsgChan: // 内存消息不为空
+			// 按照百分比发送消息给客户端 实现负载均衡
 			if sampleRate > 0 && rand.Int31n(100) > sampleRate {
 				continue
 			}
 			msg.Attempts++ // 尝试次数+1
 
+			// 根据客户端的超时
 			subChannel.StartInFlightTimeout(msg, client.ID, msgTimeout)
 			client.SendingMessage()
 			err = p.SendMessage(client, msg)
@@ -404,6 +411,7 @@ func (p *protocolV2) IDENTIFY(client *clientV2, params [][]byte) ([]byte, error)
 		return okBytes, nil
 	}
 
+	// 设置自客户端上传的值
 	tlsv1 := p.ctx.nsqd.tlsConfig != nil && identifyData.TLSv1
 	deflate := p.ctx.nsqd.getOpts().DeflateEnabled && identifyData.Deflate
 	deflateLevel := 6
@@ -572,7 +580,7 @@ func (p *protocolV2) AUTH(client *clientV2, params [][]byte) ([]byte, error) {
 func (p *protocolV2) CheckAuth(client *clientV2, cmd, topicName, channelName string) error {
 	// if auth is enabled, the client must have authorized already
 	// compare topic/channel against cached authorization data (refetching if expired)
-	if client.ctx.nsqd.IsAuthEnabled() {
+	if client.ctx.nsqd.IsAuthEnabled() { // 是否启用了认证
 		if !client.HasAuthorizations() {
 			return protocol.NewFatalClientErr(nil, "E_AUTH_FIRST",
 				fmt.Sprintf("AUTH required before %s", cmd))
@@ -591,6 +599,7 @@ func (p *protocolV2) CheckAuth(client *clientV2, cmd, topicName, channelName str
 	return nil
 }
 
+// 客户端订阅 SUB topicname channelname
 func (p *protocolV2) SUB(client *clientV2, params [][]byte) ([]byte, error) {
 	if atomic.LoadInt32(&client.State) != stateInit {
 		return nil, protocol.NewFatalClientErr(nil, "E_INVALID", "cannot SUB in current state")
@@ -620,6 +629,7 @@ func (p *protocolV2) SUB(client *clientV2, params [][]byte) ([]byte, error) {
 		return nil, err
 	}
 
+	// TODO:？？？
 	// This retry-loop is a work-around for a race condition, where the
 	// last client can leave the channel between GetChannel() and AddClient().
 	// Avoid adding a client to an ephemeral channel / topic which has started exiting.
@@ -647,6 +657,7 @@ func (p *protocolV2) SUB(client *clientV2, params [][]byte) ([]byte, error) {
 func (p *protocolV2) RDY(client *clientV2, params [][]byte) ([]byte, error) {
 	state := atomic.LoadInt32(&client.State)
 
+	// 正在关闭状态 忽略客户端ready
 	if state == stateClosing {
 		// just ignore ready changes on a closing channel
 		p.ctx.nsqd.logf(LOG_INFO,
@@ -655,6 +666,7 @@ func (p *protocolV2) RDY(client *clientV2, params [][]byte) ([]byte, error) {
 		return nil, nil
 	}
 
+	// 订阅状态才可以发送ready命令
 	if state != stateSubscribed {
 		return nil, protocol.NewFatalClientErr(nil, "E_INVALID", "cannot RDY in current state")
 	}
@@ -681,6 +693,7 @@ func (p *protocolV2) RDY(client *clientV2, params [][]byte) ([]byte, error) {
 	return nil, nil
 }
 
+// 客户端反馈消息接收成功
 func (p *protocolV2) FIN(client *clientV2, params [][]byte) ([]byte, error) {
 	state := atomic.LoadInt32(&client.State)
 	if state != stateSubscribed && state != stateClosing {
@@ -691,6 +704,7 @@ func (p *protocolV2) FIN(client *clientV2, params [][]byte) ([]byte, error) {
 		return nil, protocol.NewFatalClientErr(nil, "E_INVALID", "FIN insufficient number of params")
 	}
 
+	// 返回的是指向params[1]的指针
 	id, err := getMessageID(params[1])
 	if err != nil {
 		return nil, protocol.NewFatalClientErr(nil, "E_INVALID", err.Error())
@@ -707,6 +721,7 @@ func (p *protocolV2) FIN(client *clientV2, params [][]byte) ([]byte, error) {
 	return nil, nil
 }
 
+// 消息重新放入投递队列 投递失败
 func (p *protocolV2) REQ(client *clientV2, params [][]byte) ([]byte, error) {
 	state := atomic.LoadInt32(&client.State)
 	if state != stateSubscribed && state != stateClosing {
@@ -754,6 +769,7 @@ func (p *protocolV2) REQ(client *clientV2, params [][]byte) ([]byte, error) {
 	return nil, nil
 }
 
+// client close
 func (p *protocolV2) CLS(client *clientV2, params [][]byte) ([]byte, error) {
 	if atomic.LoadInt32(&client.State) != stateSubscribed {
 		return nil, protocol.NewFatalClientErr(nil, "E_INVALID", "cannot CLS in current state")
@@ -768,6 +784,7 @@ func (p *protocolV2) NOP(client *clientV2, params [][]byte) ([]byte, error) {
 	return nil, nil
 }
 
+// Publisher 发布消息
 func (p *protocolV2) PUB(client *clientV2, params [][]byte) ([]byte, error) {
 	var err error
 
@@ -818,6 +835,7 @@ func (p *protocolV2) PUB(client *clientV2, params [][]byte) ([]byte, error) {
 	return okBytes, nil
 }
 
+// 发布多个消息
 func (p *protocolV2) MPUB(client *clientV2, params [][]byte) ([]byte, error) {
 	var err error
 
@@ -871,6 +889,7 @@ func (p *protocolV2) MPUB(client *clientV2, params [][]byte) ([]byte, error) {
 	return okBytes, nil
 }
 
+// 发布一个延迟消息
 func (p *protocolV2) DPUB(client *clientV2, params [][]byte) ([]byte, error) {
 	var err error
 
@@ -935,6 +954,7 @@ func (p *protocolV2) DPUB(client *clientV2, params [][]byte) ([]byte, error) {
 	return okBytes, nil
 }
 
+// 重设消息的优先级 延长消息的超时时间
 func (p *protocolV2) TOUCH(client *clientV2, params [][]byte) ([]byte, error) {
 	state := atomic.LoadInt32(&client.State)
 	if state != stateSubscribed && state != stateClosing {
@@ -1021,6 +1041,7 @@ func readLen(r io.Reader, tmp []byte) (int32, error) {
 	return int32(binary.BigEndian.Uint32(tmp)), nil
 }
 
+// 客户端是否需要使用tls
 func enforceTLSPolicy(client *clientV2, p *protocolV2, command []byte) error {
 	if p.ctx.nsqd.getOpts().TLSRequired != TLSNotRequired && atomic.LoadInt32(&client.TLS) != 1 {
 		return protocol.NewFatalClientErr(nil, "E_INVALID",

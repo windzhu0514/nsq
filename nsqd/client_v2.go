@@ -36,7 +36,7 @@ type identifyDataV2 struct {
 	Deflate             bool   `json:"deflate"`       // 允许 deflate 压缩这次连接
 	DeflateLevel        int    `json:"deflate_level"` // deflate 压缩级别
 	Snappy              bool   `json:"snappy"`        // 允许 snappy 压缩这次连接
-	SampleRate          int32  `json:"sample_rate"`   // 消息接收率
+	SampleRate          int32  `json:"sample_rate"`   // 消息发送百分比 负载均衡
 	UserAgent           string `json:"user_agent"`    // 客户端的代理
 	MsgTimeout          int    `json:"msg_timeout"`   // 配置服务端发送消息给客户端的超时时间
 }
@@ -44,7 +44,7 @@ type identifyDataV2 struct {
 type identifyEvent struct {
 	OutputBufferTimeout time.Duration
 	HeartbeatInterval   time.Duration
-	SampleRate          int32
+	SampleRate          int32 // 消息发送百分比 负载均衡
 	MsgTimeout          time.Duration
 }
 
@@ -73,8 +73,8 @@ type clientV2 struct {
 	flateWriter *flate.Writer
 
 	// reading/writing interfaces
-	Reader *bufio.Reader
-	Writer *bufio.Writer
+	Reader *bufio.Reader // 客户端tcp连接
+	Writer *bufio.Writer // 客户端tcp连接
 
 	OutputBufferSize    int
 	OutputBufferTimeout time.Duration
@@ -316,6 +316,7 @@ func (p *prettyConnectionState) GetVersion() string {
 	}
 }
 
+// 客户端是否可以接收新消息
 func (c *clientV2) IsReadyForMessages() bool {
 	if c.Channel.IsPaused() {
 		return false
@@ -510,6 +511,7 @@ func (c *clientV2) UpgradeTLS() error {
 	return nil
 }
 
+// 使用Deflate压缩算法
 func (c *clientV2) UpgradeDeflate(level int) error {
 	c.writeLock.Lock()
 	defer c.writeLock.Unlock()
@@ -530,6 +532,7 @@ func (c *clientV2) UpgradeDeflate(level int) error {
 	return nil
 }
 
+// 使用Snappy压缩算法
 func (c *clientV2) UpgradeSnappy() error {
 	c.writeLock.Lock()
 	defer c.writeLock.Unlock()

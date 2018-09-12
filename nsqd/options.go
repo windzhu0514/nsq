@@ -14,7 +14,7 @@ import (
 
 type Options struct {
 	// basic options
-	ID        int64  `flag:"node-id" cfg:"id"`
+	ID        int64  `flag:"node-id" cfg:"id"` // nsqd节点id 最大1024
 	LogLevel  string `flag:"log-level"`
 	LogPrefix string `flag:"log-prefix"`
 	Verbose   bool   `flag:"verbose"` // for backwards compatibility
