@@ -76,7 +76,8 @@ func (a *State) IsExpired() bool {
 	return false
 }
 
-// 查询其他nsqd认证状态
+// 查询client的认证状态
+// 依次查询所有的认证服务器
 func QueryAnyAuthd(authd []string, remoteIP, tlsEnabled, authSecret string,
 	connectTimeout time.Duration, requestTimeout time.Duration) (*State, error) {
 	for _, a := range authd {
@@ -109,12 +110,13 @@ func QueryAuthd(authd, remoteIP, tlsEnabled, authSecret string,
 	for _, auth := range authState.Authorizations {
 		for _, p := range auth.Permissions {
 			switch p {
-			case "subscribe", "publish":
+			case "subscribe", "publish": // 允许的操作
 			default:
 				return nil, fmt.Errorf("unknown permission %s", p)
 			}
 		}
 
+		// 下面的2项检查有什么作用
 		if _, err := regexp.Compile(auth.Topic); err != nil {
 			return nil, fmt.Errorf("unable to compile topic %q %s", auth.Topic, err)
 		}

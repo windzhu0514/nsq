@@ -331,7 +331,7 @@ func (p *protocolV2) messagePump(client *clientV2, startedChan chan bool) {
 				goto exit
 			}
 			flushed = false
-		case msg := <-memoryMsgChan: // 内存消息不为空
+		case msg := <-memoryMsgChan: // 内存消息队列不为空
 			// 按照百分比发送消息给客户端 实现负载均衡
 			if sampleRate > 0 && rand.Int31n(100) > sampleRate {
 				continue
@@ -452,7 +452,7 @@ func (p *protocolV2) IDENTIFY(client *clientV2, params [][]byte) ([]byte, error)
 		MaxDeflateLevel:     p.ctx.nsqd.getOpts().MaxDeflateLevel,
 		Snappy:              snappy,
 		SampleRate:          client.SampleRate,
-		AuthRequired:        p.ctx.nsqd.IsAuthEnabled(),
+		AuthRequired:        p.ctx.nsqd.IsAuthEnabled(), // auth_required=true client必须在 SUB, PUB 或 MPUB 命令前前发送 AUTH
 		OutputBufferSize:    client.OutputBufferSize,
 		OutputBufferTimeout: int64(client.OutputBufferTimeout / time.Millisecond),
 	})
@@ -551,6 +551,7 @@ func (p *protocolV2) AUTH(client *clientV2, params [][]byte) ([]byte, error) {
 		return nil, protocol.NewFatalClientErr(err, "E_AUTH_FAILED", "AUTH failed")
 	}
 
+	// 检查是否认证成功
 	if !client.HasAuthorizations() {
 		return nil, protocol.NewFatalClientErr(nil, "E_UNAUTHORIZED", "AUTH No authorizations found")
 	}

@@ -100,6 +100,6 @@ func (g guid) Hex() MessageID {
 	b[6] = byte(g >> 8)
 	b[7] = byte(g)
 
-	hex.Encode(h[:], b[:])
+	hex.Encode(h[:], b[:]) // hex.Encode(h, b) 可以避免类型不一致
 	return h
 }

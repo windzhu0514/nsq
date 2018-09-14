@@ -105,7 +105,7 @@ type clientV2 struct {
 	lenBuf   [4]byte
 	lenSlice []byte
 
-	AuthSecret string
+	AuthSecret string // 认证密码
 	AuthState  *auth.State
 }
 
@@ -148,6 +148,7 @@ func newClientV2(id int64, conn net.Conn, ctx *context) *clientV2 {
 		pubCounts: make(map[string]uint64),
 	}
 	c.lenSlice = c.lenBuf[:]
+	// c.lenSlice = make([]byte, 4, 4) 为什么不这样
 	return c
 }
 
@@ -613,6 +614,7 @@ func (c *clientV2) IsAuthorized(topic, channel string) (bool, error) {
 	return false, nil
 }
 
+// 客户端是否已认证过
 func (c *clientV2) HasAuthorizations() bool {
 	if c.AuthState != nil {
 		return len(c.AuthState.Authorizations) != 0
