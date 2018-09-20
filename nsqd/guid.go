@@ -9,6 +9,7 @@ package nsqd
 // of workerID + datacenterId into a single identifier, and modify the
 // behavior when sequences rollover for our specific implementation needs
 
+// 生成按时间递增的guid
 import (
 	"encoding/hex"
 	"errors"

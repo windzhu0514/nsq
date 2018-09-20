@@ -984,12 +984,13 @@ func (p *protocolV2) TOUCH(client *clientV2, params [][]byte) ([]byte, error) {
 }
 
 func readMPUB(r io.Reader, tmp []byte, topic *Topic, maxMessageSize int64, maxBodySize int64) ([]*Message, error) {
-	numMessages, err := readLen(r, tmp)
+	numMessages, err := readLen(r, tmp) // 前4个字节代表消息数量
 	if err != nil {
 		return nil, protocol.NewFatalClientErr(err, "E_BAD_BODY", "MPUB failed to read message count")
 	}
 
 	// 4 == total num, 5 == length + min 1
+	// 4 代表消息数量占用的字节数 5 代表一个消息的最小长度（4字节消息body大小 1字节消息body）
 	maxMessages := (maxBodySize - 4) / 5
 	if numMessages <= 0 || int64(numMessages) > maxMessages {
 		return nil, protocol.NewFatalClientErr(err, "E_BAD_BODY",
@@ -998,7 +999,7 @@ func readMPUB(r io.Reader, tmp []byte, topic *Topic, maxMessageSize int64, maxBo
 
 	messages := make([]*Message, 0, numMessages)
 	for i := int32(0); i < numMessages; i++ {
-		messageSize, err := readLen(r, tmp)
+		messageSize, err := readLen(r, tmp) // 4字节消息body大小
 		if err != nil {
 			return nil, protocol.NewFatalClientErr(err, "E_BAD_MESSAGE",
 				fmt.Sprintf("MPUB failed to read message(%d) body size", i))

@@ -42,6 +42,7 @@ func newHTTPServer(ctx *context, tlsEnabled bool, tlsRequired bool) *httpServer 
 	log := http_api.Log(ctx.nsqd.logf)
 
 	router := httprouter.New()
+	// 如果设置了true 有通过未注册方法访问时 使用MethodNotAllowed处理 否则使用NotFound
 	router.HandleMethodNotAllowed = true
 	router.PanicHandler = http_api.LogPanicHandler(ctx.nsqd.logf)
 	router.NotFound = http_api.LogNotFoundHandler(ctx.nsqd.logf)
@@ -112,6 +113,7 @@ func (s *httpServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	s.router.ServeHTTP(w, req)
 }
 
+// 健康状态检查
 func (s *httpServer) pingHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) (interface{}, error) {
 	health := s.ctx.nsqd.GetHealth()
 	if !s.ctx.nsqd.IsHealthy() {
@@ -120,6 +122,7 @@ func (s *httpServer) pingHandler(w http.ResponseWriter, req *http.Request, ps ht
 	return health, nil
 }
 
+// nsqd信息
 func (s *httpServer) doInfo(w http.ResponseWriter, req *http.Request, ps httprouter.Params) (interface{}, error) {
 	hostname, err := os.Hostname()
 	if err != nil {
@@ -182,6 +185,7 @@ func (s *httpServer) getTopicFromQuery(req *http.Request) (url.Values, *Topic, e
 	return reqParams, s.ctx.nsqd.GetTopic(topicName), nil
 }
 
+// 发布消息操作
 func (s *httpServer) doPUB(w http.ResponseWriter, req *http.Request, ps httprouter.Params) (interface{}, error) {
 	// TODO: one day I'd really like to just error on chunked requests
 	// to be able to fail "too big" requests before we even read
@@ -232,6 +236,7 @@ func (s *httpServer) doPUB(w http.ResponseWriter, req *http.Request, ps httprout
 	return "OK", nil
 }
 
+// 发布多个消息操作
 func (s *httpServer) doMPUB(w http.ResponseWriter, req *http.Request, ps httprouter.Params) (interface{}, error) {
 	var msgs []*Message
 	var exit bool
@@ -249,6 +254,7 @@ func (s *httpServer) doMPUB(w http.ResponseWriter, req *http.Request, ps httprou
 	}
 
 	// text mode is default, but unrecognized binary opt considered true
+	// 默认是文本模式 参数binary代表是否二进制模式 参数值不正确则认为是二进制
 	binaryMode := false
 	if vals, ok := reqParams["binary"]; ok {
 		if binaryMode, ok = boolParams[vals[0]]; !ok {
@@ -266,6 +272,7 @@ func (s *httpServer) doMPUB(w http.ResponseWriter, req *http.Request, ps httprou
 	} else {
 		// add 1 so that it's greater than our max when we test for it
 		// (LimitReader returns a "fake" EOF)
+		// TODO:为什么要加1
 		readMax := s.ctx.nsqd.getOpts().MaxBodySize + 1
 		rdr := bufio.NewReader(io.LimitReader(req.Body, readMax))
 		total := 0

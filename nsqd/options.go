@@ -122,7 +122,7 @@ func NewOptions() *Options {
 
 		MsgTimeout:    60 * time.Second,
 		MaxMsgTimeout: 15 * time.Minute,
-		MaxMsgSize:    1024 * 1024,
+		MaxMsgSize:    1024 * 1024, // 一个消息最大1M
 		MaxBodySize:   5 * 1024 * 1024,
 		MaxReqTimeout: 1 * time.Hour,
 		ClientTimeout: 60 * time.Second,

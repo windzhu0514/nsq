@@ -84,7 +84,7 @@ func New(opts *Options) *NSQD {
 		dataPath = cwd
 	}
 	if opts.Logger == nil {
-		opts.Logger = log.New(os.Stderr, opts.LogPrefix, log.Ldate|log.Ltime|log.Lmicroseconds)
+		opts.Logger = log.New(os.Stderr, opts.LogPrefix, log.Ldate|log.Ltime|log.Lshortfile|log.Lmicroseconds)
 	}
 
 	n := &NSQD{
@@ -460,6 +460,7 @@ func (n *NSQD) Exit() {
 
 // GetTopic performs a thread safe operation
 // to return a pointer to a Topic object (potentially new)
+// GetTopic 线程安全的返回一个Topic对象指针（可能是新创建的）
 func (n *NSQD) GetTopic(topicName string) *Topic {
 	// most likely, we already have this topic, so try read lock first.
 	n.RLock()
@@ -470,7 +471,7 @@ func (n *NSQD) GetTopic(topicName string) *Topic {
 	}
 
 	n.Lock()
-	// 为什么再次检查 解锁加锁的过程中 可能已经有新的topic加了进来
+	// 为什么再次检查 加锁前 可能已经有新的topic加了进来
 	t, ok = n.topicMap[topicName]
 	if ok {
 		n.Unlock()

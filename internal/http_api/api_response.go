@@ -32,6 +32,7 @@ func acceptVersion(req *http.Request) int {
 	return 0
 }
 
+// 返回原始内容
 func PlainText(f APIHandler) APIHandler {
 	return func(w http.ResponseWriter, req *http.Request, ps httprouter.Params) (interface{}, error) {
 		code := 200
@@ -54,6 +55,7 @@ func PlainText(f APIHandler) APIHandler {
 	}
 }
 
+// 协议版本V1格式返回
 func V1(f APIHandler) APIHandler {
 	return func(w http.ResponseWriter, req *http.Request, ps httprouter.Params) (interface{}, error) {
 		data, err := f(w, req, ps)
