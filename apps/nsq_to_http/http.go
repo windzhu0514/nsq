@@ -22,6 +22,9 @@ func HTTPGet(endpoint string) (*http.Response, error) {
 		return nil, err
 	}
 	req.Header.Set("User-Agent", userAgent)
+	for key, val := range validCustomHeaders {
+		req.Header.Set(key, val)
+	}
 	return httpclient.Do(req)
 }
 
@@ -32,5 +35,8 @@ func HTTPPost(endpoint string, body *bytes.Buffer) (*http.Response, error) {
 	}
 	req.Header.Set("User-Agent", userAgent)
 	req.Header.Set("Content-Type", *contentType)
+	for key, val := range validCustomHeaders {
+		req.Header.Set(key, val)
+	}
 	return httpclient.Do(req)
 }
