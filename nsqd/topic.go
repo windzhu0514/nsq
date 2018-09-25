@@ -26,7 +26,7 @@ type Topic struct {
 	memoryMsgChan     chan *Message
 	startChan         chan int
 	exitChan          chan int
-	channelUpdateChan chan int
+	channelUpdateChan chan int // topic的channel数量变化 添加或删除
 	waitGroup         util.WaitGroupWrapper
 	exitFlag          int32
 	idFactory         *guidFactory
@@ -36,7 +36,7 @@ type Topic struct {
 	deleter        sync.Once
 
 	paused    int32
-	pauseChan chan int
+	pauseChan chan int // 通知暂停状态
 
 	ctx *context
 }
@@ -49,7 +49,7 @@ func NewTopic(topicName string, ctx *context, deleteCallback func(*Topic)) *Topi
 		memoryMsgChan:     make(chan *Message, ctx.nsqd.getOpts().MemQueueSize),
 		startChan:         make(chan int, 1),
 		exitChan:          make(chan int),
-		channelUpdateChan: make(chan int),
+		channelUpdateChan: make(chan int), // 无缓冲
 		ctx:               ctx,
 		paused:            0,
 		pauseChan:         make(chan int),
@@ -115,6 +115,7 @@ func (t *Topic) GetChannel(channelName string) *Channel {
 	return channel
 }
 
+// channel存在返回，不存在创建新的
 // this expects the caller to handle locking
 func (t *Topic) getOrCreateChannel(channelName string) (*Channel, bool) {
 	channel, ok := t.channelMap[channelName]
@@ -140,6 +141,7 @@ func (t *Topic) GetExistingChannel(channelName string) (*Channel, error) {
 	return channel, nil
 }
 
+// 从存在的topic中删除channel
 // DeleteExistingChannel removes a channel from the topic only if it exists
 func (t *Topic) DeleteExistingChannel(channelName string) error {
 	t.Lock()
@@ -149,6 +151,7 @@ func (t *Topic) DeleteExistingChannel(channelName string) error {
 		return errors.New("channel does not exist")
 	}
 	delete(t.channelMap, channelName)
+	// TODO:下面2句不使用defer执行 因为我们在channel异步关闭的同事继续其他操作 不太懂
 	// not defered so that we can continue while the channel async closes
 	numChannels := len(t.channelMap)
 	t.Unlock()
@@ -157,7 +160,7 @@ func (t *Topic) DeleteExistingChannel(channelName string) error {
 
 	// delete empties the channel before closing
 	// (so that we dont leave any messages around)
-	channel.Delete()
+	channel.Delete() // 等待channel关闭
 
 	// update messagePump state
 	select {
@@ -244,7 +247,7 @@ func (t *Topic) messagePump() {
 		select {
 		case <-t.channelUpdateChan:
 			continue
-		case <-t.pauseChan:
+		case <-t.pauseChan: // pauseChan非缓冲channel 未进入消息循环时设置pause状态 会阻塞 所以
 			continue
 		case <-t.exitChan:
 			goto exit
@@ -279,7 +282,7 @@ func (t *Topic) messagePump() {
 				chans = append(chans, c)
 			}
 			t.RUnlock()
-			if len(chans) == 0 || t.IsPaused() {
+			if len(chans) == 0 || t.IsPaused() { // 暂停 不再分发消息
 				memoryMsgChan = nil
 				backendChan = nil
 			} else {

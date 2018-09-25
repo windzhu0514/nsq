@@ -11,6 +11,7 @@ type tcpServer struct {
 	ctx *context
 }
 
+// 实现TCPHandler接口
 func (p *tcpServer) Handle(clientConn net.Conn) {
 	p.ctx.nsqd.logf(LOG_INFO, "TCP: new client(%s)", clientConn.RemoteAddr())
 

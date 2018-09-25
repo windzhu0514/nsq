@@ -91,15 +91,17 @@ func newHTTPServer(ctx *context, tlsEnabled bool, tlsRequired bool) *httpServer 
 	return s
 }
 
+// 设置运行时对Goroutine阻塞事件的取样频率
 func setBlockRateHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) (interface{}, error) {
 	rate, err := strconv.Atoi(req.FormValue("rate"))
 	if err != nil {
 		return nil, http_api.Err{http.StatusBadRequest, fmt.Sprintf("invalid block rate : %s", err.Error())}
 	}
-	runtime.SetBlockProfileRate(rate)
+	runtime.SetBlockProfileRate(rate) // 设置采样频率
 	return nil, nil
 }
 
+// ServeHTTP实现http.Handler接口
 func (s *httpServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	if !s.tlsEnabled && s.tlsRequired {
 		resp := fmt.Sprintf(`{"message": "TLS_REQUIRED", "https_port": %d}`,
@@ -145,6 +147,7 @@ func (s *httpServer) doInfo(w http.ResponseWriter, req *http.Request, ps httprou
 	}, nil
 }
 
+// 根据参数指定的topic名获取已存在的topic
 func (s *httpServer) getExistingTopicFromQuery(req *http.Request) (*http_api.ReqParams, *Topic, string, error) {
 	reqParams, err := http_api.NewReqParams(req)
 	if err != nil {
@@ -152,11 +155,13 @@ func (s *httpServer) getExistingTopicFromQuery(req *http.Request) (*http_api.Req
 		return nil, nil, "", http_api.Err{400, "INVALID_REQUEST"}
 	}
 
+	// 取出并验证topic和channel的名字
 	topicName, channelName, err := http_api.GetTopicChannelArgs(reqParams)
 	if err != nil {
 		return nil, nil, "", http_api.Err{400, err.Error()}
 	}
 
+	// 获取存在的topic
 	topic, err := s.ctx.nsqd.GetExistingTopic(topicName)
 	if err != nil {
 		return nil, nil, "", http_api.Err{404, "TOPIC_NOT_FOUND"}
@@ -165,6 +170,7 @@ func (s *httpServer) getExistingTopicFromQuery(req *http.Request) (*http_api.Req
 	return reqParams, topic, channelName, err
 }
 
+// 根据参数指定的topic名获取topic,不存在新建
 func (s *httpServer) getTopicFromQuery(req *http.Request) (url.Values, *Topic, error) {
 	reqParams, err := url.ParseQuery(req.URL.RawQuery)
 	if err != nil {
@@ -317,11 +323,13 @@ func (s *httpServer) doMPUB(w http.ResponseWriter, req *http.Request, ps httprou
 	return "OK", nil
 }
 
+// 创建topic
 func (s *httpServer) doCreateTopic(w http.ResponseWriter, req *http.Request, ps httprouter.Params) (interface{}, error) {
 	_, _, err := s.getTopicFromQuery(req)
 	return nil, err
 }
 
+// 清空topic
 func (s *httpServer) doEmptyTopic(w http.ResponseWriter, req *http.Request, ps httprouter.Params) (interface{}, error) {
 	reqParams, err := http_api.NewReqParams(req)
 	if err != nil {
@@ -351,6 +359,7 @@ func (s *httpServer) doEmptyTopic(w http.ResponseWriter, req *http.Request, ps h
 	return nil, nil
 }
 
+// 删除存在的topic
 func (s *httpServer) doDeleteTopic(w http.ResponseWriter, req *http.Request, ps httprouter.Params) (interface{}, error) {
 	reqParams, err := http_api.NewReqParams(req)
 	if err != nil {
@@ -371,6 +380,7 @@ func (s *httpServer) doDeleteTopic(w http.ResponseWriter, req *http.Request, ps 
 	return nil, nil
 }
 
+// 暂停topic
 func (s *httpServer) doPauseTopic(w http.ResponseWriter, req *http.Request, ps httprouter.Params) (interface{}, error) {
 	reqParams, err := http_api.NewReqParams(req)
 	if err != nil {
@@ -406,6 +416,7 @@ func (s *httpServer) doPauseTopic(w http.ResponseWriter, req *http.Request, ps h
 	return nil, nil
 }
 
+// 已存在的topic下创单channel
 func (s *httpServer) doCreateChannel(w http.ResponseWriter, req *http.Request, ps httprouter.Params) (interface{}, error) {
 	_, topic, channelName, err := s.getExistingTopicFromQuery(req)
 	if err != nil {
@@ -415,6 +426,7 @@ func (s *httpServer) doCreateChannel(w http.ResponseWriter, req *http.Request, p
 	return nil, nil
 }
 
+// 清空已存在的topic下的channel
 func (s *httpServer) doEmptyChannel(w http.ResponseWriter, req *http.Request, ps httprouter.Params) (interface{}, error) {
 	_, topic, channelName, err := s.getExistingTopicFromQuery(req)
 	if err != nil {
@@ -434,6 +446,7 @@ func (s *httpServer) doEmptyChannel(w http.ResponseWriter, req *http.Request, ps
 	return nil, nil
 }
 
+// 删除已存在的topic下的channel
 func (s *httpServer) doDeleteChannel(w http.ResponseWriter, req *http.Request, ps httprouter.Params) (interface{}, error) {
 	_, topic, channelName, err := s.getExistingTopicFromQuery(req)
 	if err != nil {
@@ -448,6 +461,7 @@ func (s *httpServer) doDeleteChannel(w http.ResponseWriter, req *http.Request, p
 	return nil, nil
 }
 
+// 暂停或者恢复已暂停的channel
 func (s *httpServer) doPauseChannel(w http.ResponseWriter, req *http.Request, ps httprouter.Params) (interface{}, error) {
 	_, topic, channelName, err := s.getExistingTopicFromQuery(req)
 	if err != nil {
@@ -477,6 +491,7 @@ func (s *httpServer) doPauseChannel(w http.ResponseWriter, req *http.Request, ps
 	return nil, nil
 }
 
+// 获取topic channel 生产者 程序内存状态
 func (s *httpServer) doStats(w http.ResponseWriter, req *http.Request, ps httprouter.Params) (interface{}, error) {
 	reqParams, err := http_api.NewReqParams(req)
 	if err != nil {
@@ -495,6 +510,7 @@ func (s *httpServer) doStats(w http.ResponseWriter, req *http.Request, ps httpro
 	startTime := s.ctx.nsqd.GetStartTime()
 	uptime := time.Since(startTime)
 
+	// 如果指定了topic名 只返回该topic的状态信息
 	// filter by topic (if specified)
 	if len(topicName) > 0 {
 		for _, topicStats := range stats {
@@ -536,6 +552,7 @@ func (s *httpServer) doStats(w http.ResponseWriter, req *http.Request, ps httpro
 		producerStats = filteredProducerStats
 	}
 
+	// 内存状态信息
 	ms := getMemStats()
 	if !jsonFormat {
 		return s.printStats(stats, producerStats, ms, health, startTime, uptime), nil
@@ -662,6 +679,8 @@ func (s *httpServer) printStats(stats []TopicStats, producerStats []ClientStats,
 	return buf.Bytes()
 }
 
+// 更新配置
+// ps：url path里的参数/config/:opt
 func (s *httpServer) doConfig(w http.ResponseWriter, req *http.Request, ps httprouter.Params) (interface{}, error) {
 	opt := ps.ByName("opt")
 
@@ -701,9 +720,10 @@ func (s *httpServer) doConfig(w http.ResponseWriter, req *http.Request, ps httpr
 			return nil, http_api.Err{400, "INVALID_OPTION"}
 		}
 		s.ctx.nsqd.swapOpts(&opts)
-		s.ctx.nsqd.triggerOptsNotification()
+		s.ctx.nsqd.triggerOptsNotification() // 通知配置改变
 	}
 
+	// 返回修改后的值
 	v, ok := getOptByCfgName(s.ctx.nsqd.getOpts(), opt)
 	if !ok {
 		return nil, http_api.Err{400, "INVALID_OPTION"}

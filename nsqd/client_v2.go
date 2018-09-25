@@ -258,6 +258,7 @@ func (c *clientV2) Stats() ClientStats {
 	return stats
 }
 
+// 发布消息的数量大于0 认为是生产者  每个客户端可以是生产者也可以是消费者
 func (c *clientV2) IsProducer() bool {
 	c.metaLock.RLock()
 	retval := len(c.pubCounts) > 0

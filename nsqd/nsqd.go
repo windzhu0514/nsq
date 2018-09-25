@@ -180,6 +180,7 @@ func (n *NSQD) swapOpts(opts *Options) {
 }
 
 func (n *NSQD) triggerOptsNotification() {
+	// 这种写法不阻塞且保证只被发送一次，接收端处理后才可以再次发送
 	select {
 	case n.optsNotificationChan <- struct{}{}:
 	default:

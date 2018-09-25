@@ -75,6 +75,7 @@ func connectCallback(n *NSQD, hostname string) func(*lookupPeer) {
 	}
 }
 
+// lookupd发现、测活 向lookupd通知topic、channel增删
 func (n *NSQD) lookupLoop() {
 	var lookupPeers []*lookupPeer // nsqlookupd ������
 	var lookupAddrs []string      // nsqlookupd ��ַ
@@ -151,6 +152,8 @@ func (n *NSQD) lookupLoop() {
 		case <-n.optsNotificationChan:
 			var tmpPeers []*lookupPeer
 			var tmpAddrs []string
+
+			// 检查如果地址有减少 关闭 如果有增加在if connect { 里创建新的
 			for _, lp := range lookupPeers {
 				if in(lp.addr, n.getOpts().NSQLookupdTCPAddresses) {
 					tmpPeers = append(tmpPeers, lp)

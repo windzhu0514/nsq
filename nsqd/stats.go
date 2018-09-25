@@ -127,6 +127,7 @@ type ChannelsByName struct {
 
 func (c ChannelsByName) Less(i, j int) bool { return c.Channels[i].name < c.Channels[j].name }
 
+// topic 为空获取全部topic的状态 channel为空获取全部channel的状态
 func (n *NSQD) GetStats(topic string, channel string) []TopicStats {
 	n.RLock()
 	var realTopics []*Topic
@@ -175,6 +176,7 @@ func (n *NSQD) GetStats(topic string, channel string) []TopicStats {
 	return topics
 }
 
+// 获取生产者客户端的状态
 func (n *NSQD) GetProducerStats() []ClientStats {
 	n.clientLock.RLock()
 	var producers []Client
@@ -203,12 +205,14 @@ type memStats struct {
 	GCTotalRuns       uint32 `json:"gc_total_runs"`
 }
 
+// 内存状态
 func getMemStats() memStats {
 	var ms runtime.MemStats
 	runtime.ReadMemStats(&ms)
 
 	// sort the GC pause array
 	length := len(ms.PauseNs)
+	// 没执行够256次gc
 	if int(ms.NumGC) < length {
 		length = int(ms.NumGC)
 	}
