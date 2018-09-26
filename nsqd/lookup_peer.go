@@ -11,7 +11,9 @@ import (
 	"github.com/windzhu0514/nsq/internal/lg"
 )
 
-// 一个lookupPeer实例用来懒惰连接nsqlookupd和优雅的重连
+// lookupPeer 是个底层类型，用来连接、读取、写入nsqlookupd
+// 一个lookupPeer实例用来惰性连接nsqlookupd和优雅的重连（也就是说这个库处理了所有的相关操作）。
+// client 可以简单使用命令接口进行数据传输
 // lookupPeer is a low-level type for connecting/reading/writing to nsqlookupd
 //
 // A lookupPeer instance is designed to connect lazily to nsqlookupd and reconnect
@@ -105,6 +107,7 @@ func (lp *lookupPeer) Command(cmd *nsq.Command) ([]byte, error) {
 			lp.Close()
 			return nil, err
 		}
+		// 连接前是断开状态 调用连接回调函数
 		if initialState == stateDisconnected {
 			lp.connectCallback(lp)
 		}
@@ -115,7 +118,7 @@ func (lp *lookupPeer) Command(cmd *nsq.Command) ([]byte, error) {
 	if cmd == nil {
 		return nil, nil
 	}
-	_, err := cmd.WriteTo(lp)
+	_, err := cmd.WriteTo(lp) // 发送命令
 	if err != nil {
 		lp.Close()
 		return nil, err
@@ -131,7 +134,7 @@ func (lp *lookupPeer) Command(cmd *nsq.Command) ([]byte, error) {
 func readResponseBounded(r io.Reader, limit int64) ([]byte, error) {
 	var msgSize int32
 
-	// message size
+	// message size 读取返回的消息体长度
 	err := binary.Read(r, binary.BigEndian, &msgSize)
 	if err != nil {
 		return nil, err

@@ -1,3 +1,4 @@
+// 消息结构、消息解码
 package nsqd
 
 import (

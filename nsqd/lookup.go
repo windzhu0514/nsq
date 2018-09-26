@@ -14,6 +14,7 @@ import (
 
 func connectCallback(n *NSQD, hostname string) func(*lookupPeer) {
 	return func(lp *lookupPeer) {
+		// 向nsqd发送认证命令
 		ci := make(map[string]interface{})
 		ci["version"] = version.Binary
 		ci["tcp_port"] = n.RealTCPAddr().Port
@@ -48,6 +49,8 @@ func connectCallback(n *NSQD, hostname string) func(*lookupPeer) {
 			}
 		}
 
+		// 正在运行的环境 扩展新的lookupd 向新的lookupd注册当前nsq的topics、channels
+		// 整理所有要发送的命令 再统一发送 可以尽快的退出锁
 		// build all the commands first so we exit the lock(s) as fast as possible
 		var commands []*nsq.Command
 		n.RLock()
@@ -77,8 +80,8 @@ func connectCallback(n *NSQD, hostname string) func(*lookupPeer) {
 
 // lookupd发现、测活 向lookupd通知topic、channel增删
 func (n *NSQD) lookupLoop() {
-	var lookupPeers []*lookupPeer // nsqlookupd ������
-	var lookupAddrs []string      // nsqlookupd ��ַ
+	var lookupPeers []*lookupPeer // nsqlookupd 连接对象
+	var lookupAddrs []string      // nsqlookupd 地址
 	connect := true
 
 	hostname, err := os.Hostname()
@@ -98,7 +101,7 @@ func (n *NSQD) lookupLoop() {
 				n.logf(LOG_INFO, "LOOKUP(%s): adding peer", host)
 				lookupPeer := newLookupPeer(host, n.getOpts().MaxBodySize, n.logf,
 					connectCallback(n, hostname))
-				lookupPeer.Command(nil) // start the connection
+				lookupPeer.Command(nil) // start the connection 发送nil命令 让连接生效
 				lookupPeers = append(lookupPeers, lookupPeer)
 				lookupAddrs = append(lookupAddrs, host)
 			}
@@ -107,7 +110,7 @@ func (n *NSQD) lookupLoop() {
 		}
 
 		select {
-		case <-ticker:
+		case <-ticker: // 心跳检测
 			// send a heartbeat and read a response (read detects closed conns)
 			for _, lookupPeer := range lookupPeers {
 				n.logf(LOG_DEBUG, "LOOKUPD(%s): sending heartbeat", lookupPeer)
@@ -117,7 +120,7 @@ func (n *NSQD) lookupLoop() {
 					n.logf(LOG_ERROR, "LOOKUPD(%s): %s - %s", lookupPeer, cmd, err)
 				}
 			}
-		case val := <-n.notifyChan:
+		case val := <-n.notifyChan: // topic、channel增加或删除
 			var cmd *nsq.Command
 			var branch string
 
@@ -149,11 +152,11 @@ func (n *NSQD) lookupLoop() {
 					n.logf(LOG_ERROR, "LOOKUPD(%s): %s - %s", lookupPeer, cmd, err)
 				}
 			}
-		case <-n.optsNotificationChan:
+		case <-n.optsNotificationChan: // Options配置改变
 			var tmpPeers []*lookupPeer
 			var tmpAddrs []string
 
-			// 检查如果地址有减少 关闭 如果有增加在if connect { 里创建新的
+			// 检查如果地址有减少 关闭 如果有增加在下次循环开始的地方创建新的
 			for _, lp := range lookupPeers {
 				if in(lp.addr, n.getOpts().NSQLookupdTCPAddresses) {
 					tmpPeers = append(tmpPeers, lp)
@@ -184,6 +187,7 @@ func in(s string, lst []string) bool {
 	return false
 }
 
+// 所有lookupd的地址
 func (n *NSQD) lookupdHTTPAddrs() []string {
 	var lookupHTTPAddrs []string
 	lookupPeers := n.lookupPeers.Load()

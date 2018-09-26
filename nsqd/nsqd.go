@@ -96,13 +96,14 @@ func New(opts *Options) *NSQD {
 		optsNotificationChan: make(chan struct{}, 1),
 		dl:                   dirlock.New(dataPath),
 	}
+	// 集群客户端
 	httpcli := http_api.NewClient(nil, opts.HTTPClientConnectTimeout, opts.HTTPClientRequestTimeout)
 	n.ci = clusterinfo.New(n.logf, httpcli)
 
-	n.lookupPeers.Store([]*lookupPeer{})
+	n.lookupPeers.Store([]*lookupPeer{}) // TODO:为什么都先初始化为空 避免load的时候返回的是nil？
 
-	n.swapOpts(opts) // 存储配置选项
-	n.errValue.Store(errStore{})
+	n.swapOpts(opts)             // 存储配置选项
+	n.errValue.Store(errStore{}) // TODO：为什么都先初始化为空 避免load的时候返回的是nil？
 
 	var err error
 	opts.logLevel, err = lg.ParseLogLevel(opts.LogLevel, opts.Verbose)
@@ -128,6 +129,7 @@ func New(opts *Options) *NSQD {
 		os.Exit(1)
 	}
 
+	// 替换StatsdPrefix
 	if opts.StatsdPrefix != "" {
 		var port string
 		_, port, err = net.SplitHostPort(opts.HTTPAddress)
@@ -143,6 +145,7 @@ func New(opts *Options) *NSQD {
 		opts.StatsdPrefix = prefixWithHost
 	}
 
+	// 是否需要TLS
 	if opts.TLSClientAuthPolicy != "" && opts.TLSRequired == TLSNotRequired {
 		opts.TLSRequired = TLSRequired
 	}
@@ -555,6 +558,7 @@ func (n *NSQD) DeleteExistingTopic(topicName string) error {
 	return nil
 }
 
+// topic、channel创建删除时调用
 func (n *NSQD) Notify(v interface{}) {
 	// since the in-memory metadata is incomplete,
 	// should not persist metadata while loading it.
@@ -563,6 +567,7 @@ func (n *NSQD) Notify(v interface{}) {
 	n.waitGroup.Wrap(func() {
 		// by selecting on exitChan we guarantee that
 		// we do not block exit, see issue #123
+		// 退出时lookupLoop可能已经结束 case n.notifyChan <- v: 会阻塞
 		select {
 		case <-n.exitChan:
 		case n.notifyChan <- v:
