@@ -4,6 +4,7 @@ import (
 	"fmt"
 )
 
+// 纳秒转换为易读格式 23456789 -> 23.5ms
 func NanoSecondToHuman(v float64) string {
 	var suffix string
 	switch {

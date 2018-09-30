@@ -416,7 +416,7 @@ func (s *httpServer) doPauseTopic(w http.ResponseWriter, req *http.Request, ps h
 	return nil, nil
 }
 
-// 已存在的topic下创单channel
+// 已存在的topic下创建channel
 func (s *httpServer) doCreateChannel(w http.ResponseWriter, req *http.Request, ps httprouter.Params) (interface{}, error) {
 	_, topic, channelName, err := s.getExistingTopicFromQuery(req)
 	if err != nil {
@@ -529,6 +529,7 @@ func (s *httpServer) doStats(w http.ResponseWriter, req *http.Request, ps httpro
 			}
 		}
 
+		// 统计名字为topicName的topic在所有生产者客户端中发布的消息数量
 		filteredProducerStats := make([]ClientStats, 0)
 		for _, clientStat := range producerStats {
 			var found bool

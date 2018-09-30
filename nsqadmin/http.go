@@ -192,6 +192,7 @@ func (s *httpServer) staticAssetHandler(w http.ResponseWriter, req *http.Request
 	return string(asset), nil
 }
 
+// 查询所有topic
 func (s *httpServer) topicsHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) (interface{}, error) {
 	var messages []string
 
@@ -389,6 +390,7 @@ func (s *httpServer) nodeHandler(w http.ResponseWriter, req *http.Request, ps ht
 	}, nil
 }
 
+// 逻辑删除生产指定topic的node
 func (s *httpServer) tombstoneNodeForTopicHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) (interface{}, error) {
 	var messages []string
 

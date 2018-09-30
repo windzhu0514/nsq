@@ -101,6 +101,7 @@ func (s *httpServer) doChannels(w http.ResponseWriter, req *http.Request, ps htt
 	}, nil
 }
 
+// 在所有nsq中查询指定topic的生产者
 func (s *httpServer) doLookup(w http.ResponseWriter, req *http.Request, ps httprouter.Params) (interface{}, error) {
 	reqParams, err := http_api.NewReqParams(req)
 	if err != nil {
@@ -127,6 +128,7 @@ func (s *httpServer) doLookup(w http.ResponseWriter, req *http.Request, ps httpr
 	}, nil
 }
 
+// 注册topic
 func (s *httpServer) doCreateTopic(w http.ResponseWriter, req *http.Request, ps httprouter.Params) (interface{}, error) {
 	reqParams, err := http_api.NewReqParams(req)
 	if err != nil {
@@ -175,6 +177,7 @@ func (s *httpServer) doDeleteTopic(w http.ResponseWriter, req *http.Request, ps 
 	return nil, nil
 }
 
+// 逻辑删除指定topic和指定node的生产者
 func (s *httpServer) doTombstoneTopicProducer(w http.ResponseWriter, req *http.Request, ps httprouter.Params) (interface{}, error) {
 	reqParams, err := http_api.NewReqParams(req)
 	if err != nil {
@@ -203,6 +206,7 @@ func (s *httpServer) doTombstoneTopicProducer(w http.ResponseWriter, req *http.R
 	return nil, nil
 }
 
+// 注册channel
 func (s *httpServer) doCreateChannel(w http.ResponseWriter, req *http.Request, ps httprouter.Params) (interface{}, error) {
 	reqParams, err := http_api.NewReqParams(req)
 	if err != nil {
@@ -261,6 +265,7 @@ type node struct {
 }
 
 func (s *httpServer) doNodes(w http.ResponseWriter, req *http.Request, ps httprouter.Params) (interface{}, error) {
+	// 返回所有认证过的生产者 过滤掉不在活跃状态的 不过滤逻辑删除的
 	// dont filter out tombstoned nodes
 	producers := s.ctx.nsqlookupd.DB.FindProducers("client", "", "").FilterByActive(
 		s.ctx.nsqlookupd.opts.InactiveProducerTimeout, 0)

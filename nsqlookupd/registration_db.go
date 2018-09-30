@@ -7,29 +7,36 @@ import (
 	"time"
 )
 
+// RegistrationDB lookupd用来保存所有的topic/channel的生产者信息
 type RegistrationDB struct {
 	sync.RWMutex
 	registrationMap map[Registration]ProducerMap
 }
 
+// 三种形式
+// topic 	topicname 	""				注册新的topic时添加 取消注册时删除
+// channel 	topicname 	channelname		注册新的channel时添加 取消注册时删除
+// client 	""			""         		nsqd在第一次连接lookupd的IDENTITY认证操作里添加
 type Registration struct {
-	Category string
-	Key      string
-	SubKey   string
+	Category string // 分类 client topic channel 其中client表示nsqd在第一次连接lookupd的IDENTITY认证
+	Key      string // topic名
+	SubKey   string // channel名
 }
 type Registrations []Registration
 
+// nsqd的信息
 type PeerInfo struct {
-	lastUpdate       int64
-	id               string
-	RemoteAddress    string `json:"remote_address"`
+	lastUpdate       int64  // 收到IDENTIFY和PING命令的时间 ns
+	id               string // nsqd的IP端口 e.g. 192.0.2.1:25
+	RemoteAddress    string `json:"remote_address"` // nsqd与lookupd连接的地址
 	Hostname         string `json:"hostname"`
-	BroadcastAddress string `json:"broadcast_address"`
-	TCPPort          int    `json:"tcp_port"`
-	HTTPPort         int    `json:"http_port"`
-	Version          string `json:"version"`
+	BroadcastAddress string `json:"broadcast_address"` // nsqd配置的broadcast_address TODO：什么用
+	TCPPort          int    `json:"tcp_port"`          // tcp_port
+	HTTPPort         int    `json:"http_port"`         // http_port
+	Version          string `json:"version"`           // nsqd的版本
 }
 
+// Producer代表一个nsqd
 type Producer struct {
 	peerInfo     *PeerInfo
 	tombstoned   bool
@@ -81,6 +88,8 @@ func (r *RegistrationDB) AddProducer(k Registration, p *Producer) bool {
 	if found == false {
 		producers[p.peerInfo.id] = p
 	}
+
+	// 新加返回true 没加返回false
 	return !found
 }
 
@@ -102,6 +111,7 @@ func (r *RegistrationDB) RemoveProducer(k Registration, id string) (bool, int) {
 	return removed, len(producers)
 }
 
+// 删除一个注册类别和该类别下所有生产者
 // remove a Registration and all it's producers
 func (r *RegistrationDB) RemoveRegistration(k Registration) {
 	r.Lock()
@@ -113,6 +123,7 @@ func (r *RegistrationDB) needFilter(key string, subkey string) bool {
 	return key == "*" || subkey == "*"
 }
 
+// 查询已注册key
 func (r *RegistrationDB) FindRegistrations(category string, key string, subkey string) Registrations {
 	r.RLock()
 	defer r.RUnlock()
@@ -207,6 +218,7 @@ func (rr Registrations) SubKeys() []string {
 	return subkeys
 }
 
+// 过滤活跃且不是逻辑删除状态的生产者
 func (pp Producers) FilterByActive(inactivityTimeout time.Duration, tombstoneLifetime time.Duration) Producers {
 	now := time.Now()
 	results := Producers{}
@@ -220,6 +232,7 @@ func (pp Producers) FilterByActive(inactivityTimeout time.Duration, tombstoneLif
 	return results
 }
 
+// 返回作为生产者的nsq的信息
 func (pp Producers) PeerInfo() []*PeerInfo {
 	results := []*PeerInfo{}
 	for _, p := range pp {

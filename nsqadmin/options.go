@@ -25,6 +25,7 @@ type Options struct {
 
 	StatsdInterval time.Duration `flag:"statsd-interval"`
 
+	// NSQLookupd 所有nsqlookupd的地址
 	NSQLookupdHTTPAddresses []string `flag:"lookupd-http-address" cfg:"nsqlookupd_http_addresses"`
 	NSQDHTTPAddresses       []string `flag:"nsqd-http-address" cfg:"nsqd_http_addresses"`
 

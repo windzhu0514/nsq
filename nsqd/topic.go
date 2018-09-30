@@ -151,7 +151,7 @@ func (t *Topic) DeleteExistingChannel(channelName string) error {
 		return errors.New("channel does not exist")
 	}
 	delete(t.channelMap, channelName)
-	// TODO:下面2句不使用defer执行 因为我们在channel异步关闭的同事继续其他操作 不太懂
+	// 下面2句不使用defer执行 在channel异步关闭的同时其他地方还可以访问channelMap
 	// not defered so that we can continue while the channel async closes
 	numChannels := len(t.channelMap)
 	t.Unlock()

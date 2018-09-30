@@ -26,7 +26,7 @@ func (s Uint64Slice) Less(i, j int) bool {
 
 func (n *NSQD) statsdLoop() {
 	var lastMemStats memStats
-	var lastStats []TopicStats
+	var lastStats []TopicStats // 上一次所有topic的状态
 	interval := n.getOpts().StatsdInterval
 	ticker := time.NewTicker(interval)
 	for {
@@ -41,14 +41,18 @@ func (n *NSQD) statsdLoop() {
 				n.logf(LOG_ERROR, "failed to create UDP socket to statsd(%s)", addr)
 				continue
 			}
+
+			// 减去一秒是为了扣除建立udp连接的时间？
 			sw := writers.NewSpreadWriter(conn, interval-time.Second, n.exitChan)
 			bw := writers.NewBoundaryBufferedWriter(sw, n.getOpts().StatsdUDPPacketSize)
 			client := statsd.NewClient(bw, prefix)
 
 			n.logf(LOG_INFO, "STATSD: pushing stats to %s", addr)
 
+			// 获取该nsqd上所有topic下所有channel的客户端消息发送状态
 			stats := n.GetStats("", "")
 			for _, topic := range stats {
+				// 从上一次的状态里查找当前topic 用于显示这次和上次的变化
 				// try to find the topic in the last collection
 				lastTopic := TopicStats{}
 				for _, checkTopic := range lastStats {
@@ -146,6 +150,7 @@ exit:
 	n.logf(LOG_INFO, "STATSD: closing")
 }
 
+// 获取arr里百分比perc代表的下标里的数据
 func percentile(perc float64, arr []uint64, length int) uint64 {
 	if length == 0 {
 		return 0

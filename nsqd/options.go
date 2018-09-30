@@ -21,22 +21,21 @@ type Options struct {
 	Logger    Logger
 	logLevel  lg.LogLevel // private, not really an option
 
-	TCPAddress             string   `flag:"tcp-address"`
-	HTTPAddress            string   `flag:"http-address"`
-	HTTPSAddress           string   `flag:"https-address"`
-	BroadcastAddress       string   `flag:"broadcast-address"`
-	NSQLookupdTCPAddresses []string `flag:"lookupd-tcp-address" cfg:"nsqlookupd_tcp_addresses"` // nsqlookupd
-	// 的地址
+	TCPAddress               string        `flag:"tcp-address"`                                        // tcp监听地址
+	HTTPAddress              string        `flag:"http-address"`                                       // http监听地址
+	HTTPSAddress             string        `flag:"https-address"`                                      // https监听地址
+	BroadcastAddress         string        `flag:"broadcast-address"`                                  // 注册到lookupd的地址 默认是hostname
+	NSQLookupdTCPAddresses   []string      `flag:"lookupd-tcp-address" cfg:"nsqlookupd_tcp_addresses"` // nsqlookupd
 	AuthHTTPAddresses        []string      `flag:"auth-http-address" cfg:"auth_http_addresses"`
 	HTTPClientConnectTimeout time.Duration `flag:"http-client-connect-timeout" cfg:"http_client_connect_timeout"`
 	HTTPClientRequestTimeout time.Duration `flag:"http-client-request-timeout" cfg:"http_client_request_timeout"`
 
 	// diskqueue options
-	DataPath        string        `flag:"data-path"`
-	MemQueueSize    int64         `flag:"mem-queue-size"`
-	MaxBytesPerFile int64         `flag:"max-bytes-per-file"`
-	SyncEvery       int64         `flag:"sync-every"`
-	SyncTimeout     time.Duration `flag:"sync-timeout"`
+	DataPath        string        `flag:"data-path"`          // 缓存消息的磁盘路径
+	MemQueueSize    int64         `flag:"mem-queue-size"`     // 内存消息队列可容纳的消息数量
+	MaxBytesPerFile int64         `flag:"max-bytes-per-file"` // 保存消息的文件最大字节数
+	SyncEvery       int64         `flag:"sync-every"`         // 磁盘队列读和写每处理多少个消息 同步状态到文件
+	SyncTimeout     time.Duration `flag:"sync-timeout"`       // 定时同步状态到文件
 
 	QueueScanInterval        time.Duration
 	QueueScanRefreshInterval time.Duration
@@ -59,11 +58,11 @@ type Options struct {
 	MaxOutputBufferTimeout time.Duration `flag:"max-output-buffer-timeout"`
 
 	// statsd integration
-	StatsdAddress       string        `flag:"statsd-address"`
-	StatsdPrefix        string        `flag:"statsd-prefix"`
-	StatsdInterval      time.Duration `flag:"statsd-interval"`
-	StatsdMemStats      bool          `flag:"statsd-mem-stats"`
-	StatsdUDPPacketSize int           `flag:"statsd-udp-packet-size"`
+	StatsdAddress       string        `flag:"statsd-address"`         // nsqd状态的推送地址 为空不开启推送
+	StatsdPrefix        string        `flag:"statsd-prefix"`          // 状态信息前缀
+	StatsdInterval      time.Duration `flag:"statsd-interval"`        // 推送nsqd状态的间隔
+	StatsdMemStats      bool          `flag:"statsd-mem-stats"`       // 是否推送nsqd内存和gc状态信息
+	StatsdUDPPacketSize int           `flag:"statsd-udp-packet-size"` // 缓存状态信息的buff大小
 
 	// e2e message latency
 	E2EProcessingLatencyWindowTime  time.Duration `flag:"e2e-processing-latency-window-time"`
@@ -74,7 +73,7 @@ type Options struct {
 	TLSKey              string `flag:"tls-key"`
 	TLSClientAuthPolicy string `flag:"tls-client-auth-policy"`
 	TLSRootCAFile       string `flag:"tls-root-ca-file"`
-	TLSRequired         int    `flag:"tls-required"`
+	TLSRequired         int    `flag:"tls-required"` // 客户端是否需要TLS连接(true, false, tcp-https)
 	TLSMinVersion       uint16 `flag:"tls-min-version"`
 
 	// compression

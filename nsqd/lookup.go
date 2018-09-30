@@ -14,7 +14,7 @@ import (
 
 func connectCallback(n *NSQD, hostname string) func(*lookupPeer) {
 	return func(lp *lookupPeer) {
-		// 向nsqd发送认证命令
+		// 向lookupd发送认证命令 nsq相关信息
 		ci := make(map[string]interface{})
 		ci["version"] = version.Binary
 		ci["tcp_port"] = n.RealTCPAddr().Port

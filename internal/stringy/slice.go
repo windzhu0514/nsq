@@ -10,6 +10,7 @@ func Add(s []string, a string) []string {
 
 }
 
+// 求2个string切片的并集
 func Union(s []string, a []string) []string {
 	for _, entry := range a {
 		found := false
@@ -26,6 +27,7 @@ func Union(s []string, a []string) []string {
 	return s
 }
 
+// 过滤
 func Uniq(s []string) (r []string) {
 	for _, entry := range s {
 		found := false

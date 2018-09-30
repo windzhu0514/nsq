@@ -32,7 +32,7 @@ type Producer struct {
 	Version          string         `json:"version"`
 	VersionObj       semver.Version `json:"-"`
 	Topics           ProducerTopics `json:"topics"`
-	OutOfDate        bool           `json:"out_of_date"`
+	OutOfDate        bool           `json:"out_of_date"` // 是否过期
 }
 
 // UnmarshalJSON implements json.Unmarshaler and postprocesses of ProducerTopics and VersionObj

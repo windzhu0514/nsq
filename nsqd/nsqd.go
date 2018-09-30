@@ -74,7 +74,7 @@ type NSQD struct {
 	exitChan             chan int
 	waitGroup            util.WaitGroupWrapper
 
-	ci *clusterinfo.ClusterInfo
+	ci *clusterinfo.ClusterInfo // 每个nsqd都可以通过ci来查询所有nsq和nsqlookupd的信息
 }
 
 func New(opts *Options) *NSQD {
@@ -96,7 +96,7 @@ func New(opts *Options) *NSQD {
 		optsNotificationChan: make(chan struct{}, 1),
 		dl:                   dirlock.New(dataPath),
 	}
-	// 集群客户端
+	// 集群客户端  使用统一的http客户端 方便协议版本修改
 	httpcli := http_api.NewClient(nil, opts.HTTPClientConnectTimeout, opts.HTTPClientRequestTimeout)
 	n.ci = clusterinfo.New(n.logf, httpcli)
 
@@ -283,8 +283,8 @@ func (n *NSQD) Main() {
 		})
 	}
 
-	n.waitGroup.Wrap(n.queueScanLoop)
-	n.waitGroup.Wrap(n.lookupLoop)
+	n.waitGroup.Wrap(n.queueScanLoop) // 检查消息队列中消息是否超时
+	n.waitGroup.Wrap(n.lookupLoop)    // 保持和lookupd的连接
 	if n.getOpts().StatsdAddress != "" {
 		n.waitGroup.Wrap(n.statsdLoop)
 	}
@@ -657,7 +657,7 @@ func (n *NSQD) queueScanWorker(workCh chan *Channel, responseCh chan bool, close
 // 使用Redis的probabilistic expiration算法：每隔QueueScanInterval（默认100ms）从局部的
 // list（每隔QueueScanRefreshInterval（默认5秒）时间刷新）中随机选取QueueScanSelectionCount（默认20）个channel
 
-// 如果其中一个队列有工作要做，则该channel被视为"dirty"
+// 如果其中一个队列有工作要做，则该channel被视为"dirty"（队列里消息超时了）
 
 // 如果选取的channels中有QueueScanDirtyPercent（默认25%）是dirty,直接进行下一次循环而不sleep
 
@@ -730,6 +730,7 @@ exit:
 	refreshTicker.Stop() // 定时器处于阻塞状态 结束定时器
 }
 
+// 生成tls配置
 func buildTLSConfig(opts *Options) (*tls.Config, error) {
 	var tlsConfig *tls.Config
 
@@ -739,6 +740,7 @@ func buildTLSConfig(opts *Options) (*tls.Config, error) {
 
 	tlsClientAuthPolicy := tls.VerifyClientCertIfGiven
 
+	// 加载证书
 	cert, err := tls.LoadX509KeyPair(opts.TLSCert, opts.TLSKey)
 	if err != nil {
 		return nil, err

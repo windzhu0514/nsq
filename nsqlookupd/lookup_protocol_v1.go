@@ -68,6 +68,8 @@ func (p *LookupProtocolV1) IOLoop(conn net.Conn) error {
 
 	conn.Close()
 	p.ctx.nsqlookupd.logf(LOG_INFO, "CLIENT(%s): closing", client)
+
+	// nsqd断开连接 删除所有注册的信息
 	if client.peerInfo != nil {
 		registrations := p.ctx.nsqlookupd.DB.LookupRegistrations(client.peerInfo.id)
 		for _, r := range registrations {
@@ -116,6 +118,7 @@ func getTopicChan(command string, params []string) (string, string, error) {
 	return topicName, channelName, nil
 }
 
+// nsqd新建一个topic或者channel
 func (p *LookupProtocolV1) REGISTER(client *ClientV1, reader *bufio.Reader, params []string) ([]byte, error) {
 	if client.peerInfo == nil {
 		return nil, protocol.NewFatalClientErr(nil, "E_INVALID", "client must IDENTIFY")
@@ -186,6 +189,7 @@ func (p *LookupProtocolV1) UNREGISTER(client *ClientV1, reader *bufio.Reader, pa
 	return []byte("OK"), nil
 }
 
+// nsqd发来认证消息  nsqd.connectCallback
 func (p *LookupProtocolV1) IDENTIFY(client *ClientV1, reader *bufio.Reader, params []string) ([]byte, error) {
 	var err error
 

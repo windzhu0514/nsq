@@ -19,8 +19,8 @@ type Options struct {
 	HTTPAddress      string `flag:"http-address"`
 	BroadcastAddress string `flag:"broadcast-address"`
 
-	InactiveProducerTimeout time.Duration `flag:"inactive-producer-timeout"`
-	TombstoneLifetime       time.Duration `flag:"tombstone-lifetime"`
+	InactiveProducerTimeout time.Duration `flag:"inactive-producer-timeout"` // 生产者从最后一次ping开始保留在活跃列表里的时间
+	TombstoneLifetime       time.Duration `flag:"tombstone-lifetime"`        // 已注册的生产者保持逻辑删除状态的时间
 }
 
 func NewOptions() *Options {
