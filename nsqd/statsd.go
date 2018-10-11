@@ -24,6 +24,7 @@ func (s Uint64Slice) Less(i, j int) bool {
 	return s[i] < s[j]
 }
 
+// 定时推送nsqd的状态信息
 func (n *NSQD) statsdLoop() {
 	var lastMemStats memStats
 	var lastStats []TopicStats // 上一次所有topic的状态
@@ -42,7 +43,7 @@ func (n *NSQD) statsdLoop() {
 				continue
 			}
 
-			// 减去一秒是为了扣除建立udp连接的时间？
+			//TODO: 减去一秒是为了扣除建立udp连接的时间？
 			sw := writers.NewSpreadWriter(conn, interval-time.Second, n.exitChan)
 			bw := writers.NewBoundaryBufferedWriter(sw, n.getOpts().StatsdUDPPacketSize)
 			client := statsd.NewClient(bw, prefix)

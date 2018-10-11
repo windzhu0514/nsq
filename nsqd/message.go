@@ -23,9 +23,9 @@ type Message struct {
 	Attempts  uint16 // 消息发送给客户端的尝试次数
 
 	// for in-flight handling
-	deliveryTS time.Time
+	deliveryTS time.Time // 消息发送时的时间戳
 	clientID   int64
-	pri        int64
+	pri        int64 // 已发送消息的优先级（纳秒时间）用于堆排序
 	index      int
 	deferred   time.Duration
 }

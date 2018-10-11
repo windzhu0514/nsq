@@ -31,6 +31,7 @@ var boolParams = map[string]bool{
 	"0":     false,
 }
 
+// httpServer http https服务
 type httpServer struct {
 	ctx         *context
 	tlsEnabled  bool

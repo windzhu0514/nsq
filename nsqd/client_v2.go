@@ -50,7 +50,7 @@ type identifyEvent struct {
 
 type clientV2 struct {
 	// 64bit atomic vars need to be first for proper alignment on 32bit platforms
-	ReadyCount    int64
+	ReadyCount    int64 // 客户端ready时指定的消息数量 正在发送的消息数量大于ReadyCount时不再向客户端发送新消息
 	InFlightCount int64
 	MessageCount  uint64
 	FinishCount   uint64
@@ -393,6 +393,7 @@ func (c *clientV2) StartClose() {
 	atomic.StoreInt32(&c.State, stateClosing)
 }
 
+// 通知客户端channel的paused状态有改变
 func (c *clientV2) Pause() {
 	c.tryUpdateReadyState()
 }

@@ -36,7 +36,7 @@ func (pq *PriorityQueue) Push(x interface{}) {
 	n := len(*pq)
 	c := cap(*pq)
 	if n+1 > c {
-		npq := make(PriorityQueue, n, c*2)
+		npq := make(PriorityQueue, n, c*2) // 扩容
 		copy(npq, *pq)
 		*pq = npq
 	}
@@ -49,8 +49,10 @@ func (pq *PriorityQueue) Push(x interface{}) {
 func (pq *PriorityQueue) Pop() interface{} {
 	n := len(*pq)
 	c := cap(*pq)
+
+	// 容量大于25时，如果内容长度小于容量的一般，容量缩减一半。
 	if n < (c/2) && c > 25 {
-		npq := make(PriorityQueue, n, c/2)
+		npq := make(PriorityQueue, n, c/2) // 缩容
 		copy(npq, *pq)
 		*pq = npq
 	}

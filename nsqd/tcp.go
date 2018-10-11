@@ -7,6 +7,7 @@ import (
 	"github.com/windzhu0514/nsq/internal/protocol"
 )
 
+// tcpServer 客户端与nsqd通信及消息发送
 type tcpServer struct {
 	ctx *context
 }

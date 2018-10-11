@@ -280,7 +280,7 @@ func (p *protocolV2) messagePump(client *clientV2, startedChan chan bool) {
 				goto exit
 			}
 			flushed = true
-		case <-client.ReadyStateChan: // TODO:
+		case <-client.ReadyStateChan: // TODO:在这里有什么作用
 		case subChannel = <-subEventChan: // SUB 操作已完成
 			// you can't SUB anymore
 			subEventChan = nil // 当前客户端不能再重复订阅了
@@ -312,7 +312,7 @@ func (p *protocolV2) messagePump(client *clientV2, startedChan chan bool) {
 				goto exit
 			}
 		case b := <-backendMsgChan: // 备份消息不为空
-			// 按照百分比发送消息给客户端 实现负载均衡
+			// 概率性发送消息给客户端 实现负载均衡
 			if sampleRate > 0 && rand.Int31n(100) > sampleRate {
 				continue
 			}
@@ -324,7 +324,8 @@ func (p *protocolV2) messagePump(client *clientV2, startedChan chan bool) {
 			}
 			msg.Attempts++
 
-			subChannel.StartInFlightTimeout(msg, client.ID, msgTimeout) // 发送给其他订阅了该channel的client
+			// 设置已发送消息的超时时间
+			subChannel.StartInFlightTimeout(msg, client.ID, msgTimeout)
 			client.SendingMessage()
 			err = p.SendMessage(client, msg) // 发送给当前的client
 			if err != nil {
@@ -332,13 +333,13 @@ func (p *protocolV2) messagePump(client *clientV2, startedChan chan bool) {
 			}
 			flushed = false
 		case msg := <-memoryMsgChan: // 内存消息队列不为空
-			// 按照百分比发送消息给客户端 实现负载均衡
+			// 概率性发送消息给客户端 实现负载均衡
 			if sampleRate > 0 && rand.Int31n(100) > sampleRate {
 				continue
 			}
 			msg.Attempts++ // 尝试次数+1
 
-			// 根据客户端的超时
+			// 设置已发送消息的超时时间
 			subChannel.StartInFlightTimeout(msg, client.ID, msgTimeout)
 			client.SendingMessage()
 			err = p.SendMessage(client, msg)
@@ -630,7 +631,8 @@ func (p *protocolV2) SUB(client *clientV2, params [][]byte) ([]byte, error) {
 		return nil, err
 	}
 
-	// TODO:？？？
+	// 当最后一个客户端在GetChannel()和AddClient()之间离开channel发生竞争时，这个重试循环是竞争的一种解决方法。
+	// 避免增加客户端到将要退出的临时channel或临时topic
 	// This retry-loop is a work-around for a race condition, where the
 	// last client can leave the channel between GetChannel() and AddClient().
 	// Avoid adding a client to an ephemeral channel / topic which has started exiting.
@@ -655,6 +657,7 @@ func (p *protocolV2) SUB(client *clientV2, params [][]byte) ([]byte, error) {
 	return okBytes, nil
 }
 
+// 客户端订阅后发送ready命令，并指定可接收的消息个数
 func (p *protocolV2) RDY(client *clientV2, params [][]byte) ([]byte, error) {
 	state := atomic.LoadInt32(&client.State)
 
@@ -683,6 +686,7 @@ func (p *protocolV2) RDY(client *clientV2, params [][]byte) ([]byte, error) {
 	}
 
 	if count < 0 || count > p.ctx.nsqd.getOpts().MaxRdyCount {
+		// 需要返回fatal错误，否则客户端会出现不一致的状态。
 		// this needs to be a fatal error otherwise clients would have
 		// inconsistent state
 		return nil, protocol.NewFatalClientErr(nil, "E_INVALID",

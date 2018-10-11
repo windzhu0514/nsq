@@ -127,7 +127,7 @@ type ChannelsByName struct {
 
 func (c ChannelsByName) Less(i, j int) bool { return c.Channels[i].name < c.Channels[j].name }
 
-// 获取指定topic下指定channel的所有客户端消息发送状态
+// 获取指定topic、topic下指定channel及channel下所有客户端的状态
 // topic 为空获取全部topic channel为空获取全部channel的状态
 func (n *NSQD) GetStats(topic string, channel string) []TopicStats {
 	n.RLock()

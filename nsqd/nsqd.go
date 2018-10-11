@@ -202,6 +202,7 @@ func (n *NSQD) RealHTTPSAddr() *net.TCPAddr {
 	return n.httpsListener.Addr().(*net.TCPAddr)
 }
 
+// topic和channel的消息写入磁盘队列时是否有问题
 func (n *NSQD) SetHealth(err error) {
 	n.errValue.Store(errStore{err: err})
 }
@@ -223,10 +224,12 @@ func (n *NSQD) GetHealth() string {
 	return "OK"
 }
 
+// nsqd启动时间
 func (n *NSQD) GetStartTime() time.Time {
 	return n.startTime
 }
 
+// AddClient 添加一个客户端，有新的客户端连接到nsqd
 func (n *NSQD) AddClient(clientID int64, client Client) {
 	n.clientLock.Lock()
 	n.clients[clientID] = client
@@ -266,7 +269,6 @@ func (n *NSQD) Main() {
 		}
 	}
 
-	// tcp接口
 	tcpServer := &tcpServer{ctx: ctx}
 	n.waitGroup.Wrap(func() {
 		protocol.TCPServer(n.tcpListener, tcpServer, n.logf)
@@ -286,7 +288,7 @@ func (n *NSQD) Main() {
 	n.waitGroup.Wrap(n.queueScanLoop) // 检查消息队列中消息是否超时
 	n.waitGroup.Wrap(n.lookupLoop)    // 保持和lookupd的连接
 	if n.getOpts().StatsdAddress != "" {
-		n.waitGroup.Wrap(n.statsdLoop)
+		n.waitGroup.Wrap(n.statsdLoop) //  定时推送nsqd的状态信息
 	}
 }
 
@@ -369,7 +371,7 @@ func (n *NSQD) LoadMetadata() error {
 				channel.Pause()
 			}
 		}
-		topic.Start()
+		topic.Start() // 正在加载元数据过程中，topic不会自动启动
 	}
 	return nil
 }
@@ -456,8 +458,8 @@ func (n *NSQD) Exit() {
 	n.Unlock()
 
 	n.logf(LOG_INFO, "NSQ: stopping subsystems")
-	close(n.exitChan)
-	n.waitGroup.Wait()
+	close(n.exitChan)  // 通知所有goroutine退出
+	n.waitGroup.Wait() // 等待所有goroutine退出
 	n.dl.Unlock()
 	n.logf(LOG_INFO, "NSQ: bye")
 }
@@ -475,7 +477,8 @@ func (n *NSQD) GetTopic(topicName string) *Topic {
 	}
 
 	n.Lock()
-	// 为什么再次检查 加锁前 可能已经有新的topic加了进来
+	// double check
+	// 为什么再次检查 加锁的时候出现竞争 可能有新的topic加了进来
 	t, ok = n.topicMap[topicName]
 	if ok {
 		n.Unlock()
@@ -498,7 +501,8 @@ func (n *NSQD) GetTopic(topicName string) *Topic {
 		return t
 	}
 
-	// 如果使用了lookupd，获取并创建所有订阅该topic的channel,这样可以确保收到的任何消息都缓冲到正确的channel
+	// 如果使用了lookupd，从lookupd获取所有订阅该topic的channel名字，创建所有channel,
+	// 然后再启动消息循环，这样可以确保收到的任何消息都缓冲到正确的channel
 	// if using lookupd, make a blocking call to get the topics, and immediately create them.
 	// this makes sure that any message received is buffered to the right channels
 	lookupdHTTPAddrs := n.lookupdHTTPAddrs()
@@ -543,6 +547,9 @@ func (n *NSQD) DeleteExistingTopic(topicName string) error {
 	}
 	n.RUnlock()
 
+	// delete 在关闭之前清空topic下的所有channels和topic自身（不遗漏任何消息）
+	// 在topic从map中删除前这么做，任何写入都会返回错误（比如发布新消息），而不会
+	// 创建一个新的topic进行强制订阅
 	// delete empties all channels and the topic itself before closing
 	// (so that we dont leave any messages around)
 	//
@@ -558,8 +565,10 @@ func (n *NSQD) DeleteExistingTopic(topicName string) error {
 	return nil
 }
 
-// topic、channel创建删除时调用
+// 通知topic、channel的创建删除 v是topic、channel的指针
 func (n *NSQD) Notify(v interface{}) {
+	// 由于内存中的元数据是不完整的，在元数据加载过程中不能持久化元数据。
+	// nsqd 在loading结束后会持久化新的元数据
 	// since the in-memory metadata is incomplete,
 	// should not persist metadata while loading it.
 	// nsqd will call `PersistMetadata` it after loading
@@ -584,6 +593,7 @@ func (n *NSQD) Notify(v interface{}) {
 	})
 }
 
+// channels返回所有topic下的所有channel
 // channels returns a flat slice of all channels in all topics
 func (n *NSQD) channels() []*Channel {
 	var channels []*Channel
@@ -599,7 +609,7 @@ func (n *NSQD) channels() []*Channel {
 	return channels
 }
 
-// 根据channel数量和配置确定 idealPoolSize 的大小
+// 根据channel数量和配置确定 idealPoolSize 的大小 默认channel数量的四分之一
 // 创建idealPoolSize个queueScanWorker
 // resizePool adjusts the size of the pool of queueScanWorker goroutines
 //
@@ -630,6 +640,7 @@ func (n *NSQD) resizePool(num int, workCh chan *Channel, responseCh chan bool, c
 	}
 }
 
+// queueScanWorker 通过channel从queueScanLoop结束任务（channel指针），处理延迟消息队列和正在发送队列
 // queueScanWorker receives work (in the form of a channel) from queueScanLoop
 // and processes the deferred and in-flight queues
 func (n *NSQD) queueScanWorker(workCh chan *Channel, responseCh chan bool, closeCh chan int) {
@@ -778,6 +789,7 @@ func buildTLSConfig(opts *Options) (*tls.Config, error) {
 	return tlsConfig, nil
 }
 
+// 是否启用认证（是否配置了认证地址）
 func (n *NSQD) IsAuthEnabled() bool {
 	return len(n.getOpts().AuthHTTPAddresses) != 0
 }

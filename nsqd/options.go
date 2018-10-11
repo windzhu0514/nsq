@@ -1,3 +1,4 @@
+// nsqd所有配置信息
 package nsqd
 
 import (

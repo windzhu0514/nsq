@@ -66,12 +66,15 @@ type Channel struct {
 	e2eProcessingLatencyStream *quantile.Quantile
 
 	// TODO: these can be DRYd up
-	deferredMessages map[MessageID]*pqueue.Item // 保存延迟消息
-	deferredPQ       pqueue.PriorityQueue       // 延迟消息的优先级队列
+	deferredMessages map[MessageID]*pqueue.Item // 保存延迟发送消息
+	deferredPQ       pqueue.PriorityQueue       // 延迟发送消息的优先级队列
 	deferredMutex    sync.Mutex
-	inFlightMessages map[MessageID]*Message // 正在投递但还没确认投递成功
-	inFlightPQ       inFlightPqueue         // 正在投递但还没确认投递成功的优先级队列
-	inFlightMutex    sync.Mutex
+
+	inFlightMessages map[MessageID]*Message // 保存已发送但还没确认接收成功的消息
+	// inFlightPQ不使用pqueue.PriorityQueue
+	// pqueue.PriorityQueue 里包含interface{}，赋值和取值需要类型推断，inFlightPQ使用频率高，减少类型推断提高性能。
+	inFlightPQ    inFlightPqueue // 已发送但还没确认接收成功的消息优先级队列
+	inFlightMutex sync.Mutex
 }
 
 // NewChannel creates a new instance of the Channel type and returns a pointer
@@ -302,6 +305,7 @@ func (c *Channel) IsPaused() bool {
 	return atomic.LoadInt32(&c.paused) == 1
 }
 
+// PutMessage 把从topic分发的消息写入到channel的memoryMsgChan
 // PutMessage writes a Message to the queue
 func (c *Channel) PutMessage(m *Message) error {
 	c.RLock()
@@ -317,7 +321,7 @@ func (c *Channel) PutMessage(m *Message) error {
 	return nil
 }
 
-// 分发消息
+// 待发送的消息放入内存队列，内存队列如果满了放入磁盘队列
 func (c *Channel) put(m *Message) error {
 	select {
 	case c.memoryMsgChan <- m: // opts.MemQueueSize
@@ -336,7 +340,7 @@ func (c *Channel) put(m *Message) error {
 	return nil
 }
 
-// 投递一个延迟消息
+// PutMessageDeferred 把从topic分发的延迟发送消息写入到channel的延迟发送消息队列
 func (c *Channel) PutMessageDeferred(msg *Message, timeout time.Duration) {
 	atomic.AddUint64(&c.messageCount, 1)
 	c.StartDeferredTimeout(msg, timeout)
@@ -371,7 +375,7 @@ func (c *Channel) TouchMessage(clientID int64, id MessageID, clientMsgTimeout ti
 	return nil
 }
 
-// FinishMessage 消息已成功发送 删除消息
+// FinishMessage 消息已成功发送 从正在发送的消息队列中删除消息
 // FinishMessage successfully discards an in-flight message
 func (c *Channel) FinishMessage(clientID int64, id MessageID) error {
 	msg, err := c.popInFlightMessage(clientID, id)
@@ -446,6 +450,7 @@ func (c *Channel) RemoveClient(clientID int64) {
 	}
 }
 
+// 消息已发送 设置消息的超时时间
 func (c *Channel) StartInFlightTimeout(msg *Message, clientID int64, timeout time.Duration) error {
 	now := time.Now()
 	msg.clientID = clientID
@@ -459,15 +464,15 @@ func (c *Channel) StartInFlightTimeout(msg *Message, clientID int64, timeout tim
 	return nil
 }
 
-// StartDeferredTimeout 添加一个延迟消息
+// StartDeferredTimeout 添加一个延迟发送消息
 func (c *Channel) StartDeferredTimeout(msg *Message, timeout time.Duration) error {
-	absTs := time.Now().Add(timeout).UnixNano()
+	absTs := time.Now().Add(timeout).UnixNano() // 计算优先级
 	item := &pqueue.Item{Value: msg, Priority: absTs}
-	err := c.pushDeferredMessage(item)
+	err := c.pushDeferredMessage(item) // 保存一个延迟消息
 	if err != nil {
 		return err
 	}
-	c.addToDeferredPQ(item)
+	c.addToDeferredPQ(item) // 放入优先级队列
 	return nil
 }
 
@@ -520,7 +525,7 @@ func (c *Channel) removeFromInFlightPQ(msg *Message) {
 	c.inFlightMutex.Unlock()
 }
 
-// 保存延迟消息
+// 保存一个延迟消息
 func (c *Channel) pushDeferredMessage(item *pqueue.Item) error {
 	c.deferredMutex.Lock()
 	// TODO: these map lookups are costly
@@ -555,6 +560,7 @@ func (c *Channel) addToDeferredPQ(item *pqueue.Item) {
 	c.deferredMutex.Unlock()
 }
 
+// 循环检查当前channel的延迟发送消息优先级队里的第一个消息是否到期，直到没有到期的消息。到期的消息放入发送队列。
 func (c *Channel) processDeferredQueue(t int64) bool {
 	c.exitMutex.RLock()
 	defer c.exitMutex.RUnlock()
@@ -586,7 +592,7 @@ exit:
 	return dirty
 }
 
-// 检查当前channel的正在投递消息队里的第一个消息是否超时
+// 循环检查当前channel的已发送消息优先级队里的第一个消息是否过期，直到没有过期消息。过期的消息重新发送。
 func (c *Channel) processInFlightQueue(t int64) bool {
 	c.exitMutex.RLock()
 	defer c.exitMutex.RUnlock()

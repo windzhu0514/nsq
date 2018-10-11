@@ -175,6 +175,7 @@ func (t *Topic) DeleteExistingChannel(channelName string) error {
 	return nil
 }
 
+// PutMessage 把发布的消息放入topic
 // PutMessage writes a Message to the queue
 func (t *Topic) PutMessage(m *Message) error {
 	t.RLock()
@@ -190,6 +191,7 @@ func (t *Topic) PutMessage(m *Message) error {
 	return nil
 }
 
+// PutMessage 把发布的多个消息放入topic
 // PutMessages writes multiple Messages to the queue
 func (t *Topic) PutMessages(msgs []*Message) error {
 	t.RLock()
@@ -207,7 +209,7 @@ func (t *Topic) PutMessages(msgs []*Message) error {
 	return nil
 }
 
-// 发布一个消息到队列
+// put 把发布的消息放入topic的内存队列，内存队列如果满了放入磁盘队列
 func (t *Topic) put(m *Message) error {
 	select {
 	case t.memoryMsgChan <- m:
@@ -347,6 +349,7 @@ func (t *Topic) Close() error {
 }
 
 func (t *Topic) exit(deleted bool) error {
+	// 修改exitFlag 返回结果是0 说明已经是退出状态1
 	if !atomic.CompareAndSwapInt32(&t.exitFlag, 0, 1) {
 		return errors.New("exiting")
 	}
@@ -374,6 +377,7 @@ func (t *Topic) exit(deleted bool) error {
 		}
 		t.Unlock()
 
+		// 清空队列同时删除磁盘备份文件
 		// empty the queue (deletes the backend files, too)
 		t.Empty()
 		return t.backend.Delete()
@@ -393,6 +397,7 @@ func (t *Topic) exit(deleted bool) error {
 	return t.backend.Close()
 }
 
+// Empty 清空内存消息队列 清空topic对应的磁盘文件
 func (t *Topic) Empty() error {
 	for {
 		select {

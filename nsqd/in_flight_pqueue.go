@@ -1,7 +1,7 @@
 package nsqd
 
 // 正在投递中的消息队列 最小堆（经过排序的完全二叉树 所有父节点小于2个子节点）
-// 模仿标准库的heap实现
+// 模仿标准库的heap实现，heap里包含interface{}，减低了性能
 type inFlightPqueue []*Message
 
 func newInFlightPqueue(capacity int) inFlightPqueue {
