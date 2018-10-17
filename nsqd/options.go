@@ -35,7 +35,7 @@ type Options struct {
 	DataPath        string        `flag:"data-path"`          // 缓存消息的磁盘路径
 	MemQueueSize    int64         `flag:"mem-queue-size"`     // 内存消息队列可容纳的消息数量
 	MaxBytesPerFile int64         `flag:"max-bytes-per-file"` // 保存消息的文件最大字节数
-	SyncEvery       int64         `flag:"sync-every"`         // 磁盘队列读和写每处理多少个消息 同步状态到文件
+	SyncEvery       int64         `flag:"sync-every"`         // 磁盘队列读和写每处理多少个消息同步状态到文件
 	SyncTimeout     time.Duration `flag:"sync-timeout"`       // 定时同步状态到文件
 
 	QueueScanInterval        time.Duration
