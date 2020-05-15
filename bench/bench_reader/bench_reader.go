@@ -117,5 +117,6 @@ func subWorker(td time.Duration, workers int, tcpAddr string, topic string, chan
 			rw.Flush()
 		}
 	}
+
 	atomic.AddInt64(&totalMsgCount, msgCount)
 }

@@ -243,7 +243,7 @@ func (t *Topic) messagePump() {
 	var memoryMsgChan chan *Message
 	var backendChan chan []byte
 
-	// 在Start()之前不传递消息，并且保证不阻塞Pause() or GetChannel()
+	// 保证在Start()调用不传递消息，并且保证不阻塞对Pause() 和 GetChannel()函数的阻塞
 	// do not pass messages before Start(), but avoid blocking Pause() or GetChannel()
 	for {
 		select {
@@ -271,7 +271,7 @@ func (t *Topic) messagePump() {
 	for {
 		select {
 		case msg = <-memoryMsgChan: // 内存中读到消息
-		case buf = <-backendChan: // 内存中未读到消息 从后端读取一个消息
+		case buf = <-backendChan: // 从磁盘备份读取一个消息
 			msg, err = decodeMessage(buf)
 			if err != nil {
 				t.ctx.nsqd.logf(LOG_ERROR, "failed to decode message - %s", err)
@@ -300,7 +300,7 @@ func (t *Topic) messagePump() {
 				memoryMsgChan = t.memoryMsgChan
 				backendChan = t.backend.ReadChan()
 			}
-			continue
+			continue // 修改为nil后继续等待
 		case <-t.exitChan:
 			goto exit
 		}

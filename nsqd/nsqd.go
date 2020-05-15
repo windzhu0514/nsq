@@ -447,6 +447,8 @@ func (n *NSQD) Exit() {
 	}
 
 	n.Lock()
+
+	// 保存之前 没有消息在处理了？
 	err := n.PersistMetadata()
 	if err != nil {
 		n.logf(LOG_ERROR, "failed to persist metadata - %s", err)
