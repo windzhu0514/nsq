@@ -13,8 +13,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/windzhu0514/nsq/internal/protocol"
-	"github.com/windzhu0514/nsq/internal/version"
+	"github.com/nsqio/go-nsq/internal/protocol"
+	"github.com/nsqio/go-nsq/internal/version"
 )
 
 type LookupProtocolV1 struct {

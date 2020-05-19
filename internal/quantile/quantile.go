@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/bmizerany/perks/quantile"
-	"github.com/windzhu0514/nsq/internal/stringy"
+	"github.com/nsqio/go-nsq/internal/stringy"
 )
 
 type Result struct {

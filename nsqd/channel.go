@@ -10,10 +10,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/windzhu0514/go-diskqueue"
-	"github.com/windzhu0514/nsq/internal/lg"
-	"github.com/windzhu0514/nsq/internal/pqueue"
-	"github.com/windzhu0514/nsq/internal/quantile"
+	"github.com/nsqio/go-diskqueue"
+	"github.com/nsqio/go-nsq/internal/lg"
+	"github.com/nsqio/go-nsq/internal/pqueue"
+	"github.com/nsqio/go-nsq/internal/quantile"
 )
 
 type Consumer interface {

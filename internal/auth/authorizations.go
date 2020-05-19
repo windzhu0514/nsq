@@ -8,7 +8,7 @@ import (
 	"regexp"
 	"time"
 
-	"github.com/windzhu0514/nsq/internal/http_api"
+	"github.com/nsqio/go-nsq/internal/http_api"
 )
 
 type Authorization struct {

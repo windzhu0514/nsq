@@ -13,9 +13,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/windzhu0514/nsq/internal/http_api"
-	"github.com/windzhu0514/nsq/internal/test"
-	"github.com/windzhu0514/nsq/nsqlookupd"
+	"github.com/nsqio/go-nsq/internal/http_api"
+	"github.com/nsqio/go-nsq/internal/test"
+	"github.com/nsqio/go-nsq/nsqlookupd"
 )
 
 const (

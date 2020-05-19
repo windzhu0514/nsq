@@ -6,8 +6,8 @@ import (
 	"net"
 	"time"
 
-	"github.com/windzhu0514/nsq/internal/statsd"
-	"github.com/windzhu0514/nsq/internal/writers"
+	"github.com/nsqio/go-nsq/internal/statsd"
+	"github.com/nsqio/go-nsq/internal/writers"
 )
 
 type Uint64Slice []uint64

@@ -8,10 +8,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	diskqueue "github.com/windzhu0514/go-diskqueue"
-	"github.com/windzhu0514/nsq/internal/lg"
-	"github.com/windzhu0514/nsq/internal/quantile"
-	"github.com/windzhu0514/nsq/internal/util"
+	diskqueue "github.com/nsqio/go-diskqueue"
+	"github.com/nsqio/go-nsq/internal/lg"
+	"github.com/nsqio/go-nsq/internal/quantile"
+	"github.com/nsqio/go-nsq/internal/util"
 )
 
 type Topic struct {

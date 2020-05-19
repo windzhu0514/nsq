@@ -11,9 +11,9 @@ import (
 	"sync"
 
 	"github.com/blang/semver"
-	"github.com/windzhu0514/nsq/internal/http_api"
-	"github.com/windzhu0514/nsq/internal/lg"
-	"github.com/windzhu0514/nsq/internal/stringy"
+	"github.com/nsqio/go-nsq/internal/http_api"
+	"github.com/nsqio/go-nsq/internal/lg"
+	"github.com/nsqio/go-nsq/internal/stringy"
 )
 
 type PartialErr interface {

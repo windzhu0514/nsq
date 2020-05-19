@@ -25,9 +25,9 @@ import (
 	"time"
 
 	"github.com/golang/snappy"
-	"github.com/windzhu0514/go-nsq"
-	"github.com/windzhu0514/nsq/internal/protocol"
-	"github.com/windzhu0514/nsq/internal/test"
+	"github.com/nsqio/go-nsq"
+	"github.com/nsqio/go-nsq/internal/protocol"
+	"github.com/nsqio/go-nsq/internal/test"
 )
 
 func mustStartNSQD(opts *Options) (*net.TCPAddr, *net.TCPAddr, *NSQD) {

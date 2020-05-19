@@ -7,8 +7,8 @@ import (
 	"net"
 	"time"
 
-	"github.com/windzhu0514/go-nsq"
-	"github.com/windzhu0514/nsq/internal/lg"
+	"github.com/nsqio/go-nsq"
+	"github.com/nsqio/go-nsq/internal/lg"
 )
 
 // lookupPeer 是个底层类型，用来连接、读取、写入nsqlookupd

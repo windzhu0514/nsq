@@ -5,7 +5,7 @@ import (
 	"sort"
 	"sync/atomic"
 
-	"github.com/windzhu0514/nsq/internal/quantile"
+	"github.com/nsqio/go-nsq/internal/quantile"
 )
 
 type TopicStats struct {

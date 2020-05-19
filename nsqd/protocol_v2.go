@@ -13,8 +13,8 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/windzhu0514/nsq/internal/protocol"
-	"github.com/windzhu0514/nsq/internal/version"
+	"github.com/nsqio/go-nsq/internal/protocol"
+	"github.com/nsqio/go-nsq/internal/version"
 )
 
 const maxTimeout = time.Hour

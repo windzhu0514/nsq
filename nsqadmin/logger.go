@@ -1,7 +1,7 @@
 package nsqadmin
 
 import (
-	"github.com/windzhu0514/nsq/internal/lg"
+	"github.com/nsqio/go-nsq/internal/lg"
 )
 
 type Logger lg.Logger

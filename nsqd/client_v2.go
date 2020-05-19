@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/golang/snappy"
-	"github.com/windzhu0514/nsq/internal/auth"
+	"github.com/nsqio/go-nsq/internal/auth"
 )
 
 const defaultBufferSize = 16 * 1024

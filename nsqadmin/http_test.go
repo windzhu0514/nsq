@@ -12,11 +12,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nsqio/nsq/nsqd"
-	"github.com/nsqio/nsq/nsqlookupd"
-	"github.com/windzhu0514/nsq/internal/clusterinfo"
-	"github.com/windzhu0514/nsq/internal/test"
-	"github.com/windzhu0514/nsq/internal/version"
+	"github.com/nsqio/go-nsq/nsqd"
+	"github.com/nsqio/go-nsq/nsqlookupd"
+	"github.com/nsqio/go-nsq/internal/clusterinfo"
+	"github.com/nsqio/go-nsq/internal/test"
+	"github.com/nsqio/go-nsq/internal/version"
 )
 
 type TopicsDoc struct {

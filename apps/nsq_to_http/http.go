@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/windzhu0514/nsq/internal/http_api"
-	"github.com/windzhu0514/nsq/internal/version"
+	"github.com/nsqio/go-nsq/internal/http_api"
+	"github.com/nsqio/go-nsq/internal/version"
 )
 
 var httpclient *http.Client

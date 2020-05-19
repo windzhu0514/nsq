@@ -3,7 +3,7 @@ package http_api
 import (
 	"errors"
 
-	"github.com/windzhu0514/nsq/internal/protocol"
+	"github.com/nsqio/go-nsq/internal/protocol"
 )
 
 type getter interface {

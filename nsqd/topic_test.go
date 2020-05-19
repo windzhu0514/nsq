@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/windzhu0514/nsq/internal/test"
+	"github.com/nsqio/go-nsq/internal/test"
 )
 
 func TestGetTopic(t *testing.T) {
